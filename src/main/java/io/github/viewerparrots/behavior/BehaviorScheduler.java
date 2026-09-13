@@ -79,6 +79,11 @@ public final class BehaviorScheduler {
 		}
 		ViewerParrotEntity parrot = maybeParrot.get();
 
+		// Проверяется раньше всего: падающий из мира попугай не доживёт до остальных шагов.
+		if (rescueFromVoid(viewerId, parrot)) {
+			return 1;
+		}
+
 		if (runPendingLazyAction(viewerId, runtime, parrot, now)) {
 			return 0;
 		}
@@ -93,9 +98,35 @@ public final class BehaviorScheduler {
 		}
 
 		if (runtime.behavior() == BehaviorState.FOLLOWING) {
-			tickFollowing(runtime, parrot, now);
+			return tickFollowing(runtime, parrot, now, teleportsUsed);
 		}
 		return 0;
+	}
+
+	/**
+	 * Спасение из пустоты.
+	 *
+	 * <p>Раздел 9.6 разрешает не защищать от void, но попугай, следующий за стримером мимо
+	 * обрыва, гиб в проверках раз за разом — а зритель должен быть постоянным. Поэтому
+	 * упавший ниже дна мира переносится к стримеру, пока режим смерти блокирует обычный урон.
+	 *
+	 * @return {@code true} если попугай был спасён и его тик на этом закончен
+	 */
+	private boolean rescueFromVoid(ViewerId viewerId, ViewerParrotEntity parrot) {
+		if (!this.context.config().deathMode().blocksOrdinaryDamage()) {
+			return false;
+		}
+		if (parrot.getY() >= parrot.getWorld().getBottomY()) {
+			return false;
+		}
+
+		Optional<ServerPlayerEntity> target = this.context.streamerService().onlineTarget();
+		if (target.isEmpty() || !teleportNear(parrot, target.get())) {
+			return false;
+		}
+
+		ViewerParrotsMod.LOGGER.warn("viewerId={} выпал из мира и перенесён к стримеру", viewerId);
+		return true;
 	}
 
 	private boolean runPendingLazyAction(ViewerId viewerId, ParrotRuntime runtime,
@@ -184,12 +215,13 @@ public final class BehaviorScheduler {
 		return 0;
 	}
 
-	private void tickFollowing(ParrotRuntime runtime, ViewerParrotEntity parrot, long now) {
+	private int tickFollowing(ParrotRuntime runtime, ViewerParrotEntity parrot, long now,
+			int teleportsUsed) {
 		Optional<ServerPlayerEntity> target = this.context.streamerService().onlineTarget();
 		if (target.isEmpty()) {
 			// Следование прекращается, но намерение FOLLOWING сохраняется.
 			parrot.getNavigation().stop();
-			return;
+			return 0;
 		}
 
 		double distanceSquared = parrot.squaredDistanceTo(target.get());
@@ -198,12 +230,30 @@ public final class BehaviorScheduler {
 
 		if (distanceSquared <= stop * stop) {
 			parrot.getNavigation().stop();
-			return;
+			return 0;
 		}
+
+		// Раздел 6.1 требует для follow ту же teleport policy, что и для come: дальше
+		// maxPathfindDistance навигация бессмысленна, попугай просто отстанет навсегда.
+		double maxPathfind = this.context.config().come().maxPathfindDistance();
+		if (distanceSquared > maxPathfind * maxPathfind) {
+			boolean mayTeleport = this.context.config().come().teleportIfFar()
+					&& teleportsUsed < MAX_TELEPORTS_PER_TICK
+					&& runtime.canRepath(now);
+			if (mayTeleport) {
+				runtime.markRepathed(now, this.context.config().follow().repathTicks());
+				if (teleportNear(parrot, target.get())) {
+					return 1;
+				}
+			}
+			return 0;
+		}
+
 		if (distanceSquared < start * start) {
-			return;
+			return 0;
 		}
 		moveToward(runtime, parrot, target.get(), now);
+		return 0;
 	}
 
 	/** Пересчёт маршрута не чаще, чем раз в {@code repathTicks} на попугая (раздел 14 ТЗ). */
@@ -225,7 +275,14 @@ public final class BehaviorScheduler {
 
 		Optional<Vec3d> safe = this.context.safePositionFinder().findNear(targetWorld, target.getPos());
 		if (safe.isEmpty()) {
-			return false;
+			// Запасной вариант — позиция самого стримера: он на чём-то стоит, а поиск
+			// вокруг мог ничего не найти именно у обрыва, где перенос нужнее всего.
+			Vec3d fallback = target.getPos();
+			if (!this.context.safePositionFinder().isSafe(targetWorld, fallback)) {
+				ViewerParrotsMod.LOGGER.debug("Перенос отменён: нет безопасной позиции у стримера");
+				return false;
+			}
+			safe = Optional.of(fallback);
 		}
 
 		Vec3d position = safe.get();

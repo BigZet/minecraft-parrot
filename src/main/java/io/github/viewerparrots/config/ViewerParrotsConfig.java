@@ -110,7 +110,10 @@ public record ViewerParrotsConfig(
 				new Permissions(2, 3),
 				new Come(64, 3, 200, true, true, true),
 				new Follow(6, 3, 20),
-				new Dance(100),
+				// 200 тиков вместо 100 из раздела 11: при проверке в игре пять секунд
+				// оказались слишком коротким танцем. Совпадает с cooldown, поэтому
+				// повторить танец можно ровно в момент его окончания.
+				new Dance(200),
 				new Cooldowns(100, 20, 0, 200, 300, 200),
 				new Sound(0.8, 0.9, 1.1, List.of(
 						"minecraft:entity.zombie.ambient",

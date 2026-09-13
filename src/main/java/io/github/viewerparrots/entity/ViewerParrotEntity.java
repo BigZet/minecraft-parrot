@@ -2,6 +2,7 @@ package io.github.viewerparrots.entity;
 
 import io.github.viewerparrots.ViewerParrotsMod;
 import io.github.viewerparrots.behavior.goal.DanceInPlaceGoal;
+import io.github.viewerparrots.behavior.goal.SitStillGoal;
 import io.github.viewerparrots.domain.ViewerId;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.attribute.DefaultAttributeContainer;
@@ -75,6 +76,7 @@ public class ViewerParrotEntity extends ParrotEntity {
 	protected void initGoals() {
 		super.initGoals();
 		this.goalSelector.add(0, new DanceInPlaceGoal(this));
+		this.goalSelector.add(0, new SitStillGoal(this));
 	}
 
 	@Override
