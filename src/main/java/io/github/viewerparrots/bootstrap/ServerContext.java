@@ -1,6 +1,9 @@
 package io.github.viewerparrots.bootstrap;
 
 import io.github.viewerparrots.ViewerParrotsMod;
+import io.github.viewerparrots.api.event.EventDispatcher;
+import io.github.viewerparrots.behavior.BehaviorScheduler;
+import io.github.viewerparrots.behavior.ParrotRuntime;
 import io.github.viewerparrots.config.ConfigLoader;
 import io.github.viewerparrots.config.ConfigValidator;
 import io.github.viewerparrots.config.ViewerParrotsConfig;
@@ -10,7 +13,10 @@ import io.github.viewerparrots.ratelimit.CooldownService;
 import io.github.viewerparrots.ratelimit.GlobalRateLimiter;
 import io.github.viewerparrots.registry.LoadedEntityIndex;
 import io.github.viewerparrots.registry.ViewerParrotRegistry;
+import io.github.viewerparrots.domain.ViewerId;
+import io.github.viewerparrots.service.ParrotCommandService;
 import io.github.viewerparrots.service.PermissionService;
+import io.github.viewerparrots.service.SoundService;
 import io.github.viewerparrots.service.StreamerService;
 import io.github.viewerparrots.service.ViewerParrotService;
 import io.github.viewerparrots.storage.JsonParrotRepository;
@@ -22,6 +28,8 @@ import net.minecraft.util.WorldSavePath;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
@@ -61,6 +69,20 @@ public final class ServerContext {
 	private StreamerService streamerService;
 	private ViewerParrotService parrotService;
 	private EntityRecoveryService recoveryService;
+	private ParrotCommandService commandService;
+	private SoundService soundService;
+	private BehaviorScheduler behaviorScheduler;
+
+	private final EventDispatcher events = new EventDispatcher();
+
+	/**
+	 * Runtime-состояние по зрителям. Не сохраняется: после рестарта восстанавливается
+	 * только намерение из реестра (раздел 4.2 ТЗ).
+	 */
+	private final Map<ViewerId, ParrotRuntime> runtimes = new HashMap<>();
+
+	/** Отдельный генератор для поведения: раздел 10 требует внедряемой случайности. */
+	private final Random behaviorRandom = new Random();
 
 	private StorageHealth storageHealth = StorageHealth.LOADING;
 	private String storageFaultReason;
@@ -127,6 +149,38 @@ public final class ServerContext {
 		this.streamerService = new StreamerService(this.server, this.registry);
 		this.parrotService = new ViewerParrotService(this);
 		this.recoveryService = new EntityRecoveryService(this);
+		this.soundService = new SoundService(this.config, this.behaviorRandom);
+		this.commandService = new ParrotCommandService(this);
+		this.behaviorScheduler = new BehaviorScheduler(this);
+
+		if (!this.soundService.hasUsableSounds()) {
+			// Не отказ: команды продолжат работать, но scream будет молчать,
+			// и администратор должен об этом узнать.
+			ViewerParrotsMod.LOGGER.warn(
+					"Ни один звук из белого списка не найден в реестре; scream не будет слышен");
+		}
+	}
+
+	/**
+	 * Runtime-состояние зрителя; создаётся по требованию.
+	 *
+	 * <p>При первом обращении намерение восстанавливается из реестра: временные
+	 * состояния после рестарта не возвращаются (раздел 4.2 ТЗ).
+	 */
+	public ParrotRuntime runtime(ViewerId viewerId) {
+		return this.runtimes.computeIfAbsent(viewerId, id -> {
+			ParrotRuntime created = new ParrotRuntime(id);
+			this.registry.find(id).ifPresent(record -> created.restoreDesired(record.desiredBehavior()));
+			return created;
+		});
+	}
+
+	public void forgetRuntime(ViewerId viewerId) {
+		this.runtimes.remove(viewerId);
+	}
+
+	public Map<ViewerId, ParrotRuntime> runtimes() {
+		return this.runtimes;
 	}
 
 	private void loadRegistry() {
@@ -239,6 +293,26 @@ public final class ServerContext {
 
 	public EntityRecoveryService recoveryService() {
 		return this.recoveryService;
+	}
+
+	public ParrotCommandService commandService() {
+		return this.commandService;
+	}
+
+	public BehaviorScheduler behaviorScheduler() {
+		return this.behaviorScheduler;
+	}
+
+	public SoundService soundService() {
+		return this.soundService;
+	}
+
+	public EventDispatcher events() {
+		return this.events;
+	}
+
+	public Random behaviorRandom() {
+		return this.behaviorRandom;
 	}
 
 	public StorageHealth storageHealth() {

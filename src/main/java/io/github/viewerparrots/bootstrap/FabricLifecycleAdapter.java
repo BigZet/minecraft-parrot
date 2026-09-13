@@ -180,6 +180,7 @@ public final class FabricLifecycleAdapter {
 	private static void onEndTick(MinecraftServer server) {
 		ServerContext.current().ifPresent(context -> {
 			context.recoveryService().tick();
+			context.behaviorScheduler().tick();
 			CheckpointScheduler.tick(context);
 		});
 	}

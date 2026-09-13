@@ -6,6 +6,8 @@
 	"viewerparrots.rename.ok": "Имя изменено: %s",
 	"viewerparrots.trait.ok": "Характер изменён: %s",
 	"viewerparrots.respawn.ok": "Попугай воссоздан: %s, поколение %s",
+	"viewerparrots.action.ok": "%s: команда %s принята",
+	"viewerparrots.action.delayed": "%s: команда %s отложена характером LAZY на %s тиков",
 	"viewerparrots.reconcile.loaded": "%s уже загружен (%s)",
 	"viewerparrots.reconcile.bound": "%s найден и привязан в измерении %s",
 	"viewerparrots.reconcile.no_entity": "%s не ожидает физического экземпляра (%s)",

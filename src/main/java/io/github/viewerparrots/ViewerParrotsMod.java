@@ -1,7 +1,6 @@
 package io.github.viewerparrots;
 
 import io.github.viewerparrots.bootstrap.FabricLifecycleAdapter;
-import io.github.viewerparrots.command.M0DebugCommands;
 import io.github.viewerparrots.command.ViewerParrotCommands;
 import io.github.viewerparrots.entity.ModEntities;
 import net.fabricmc.api.ModInitializer;
@@ -26,7 +25,6 @@ public class ViewerParrotsMod implements ModInitializer {
 		ModEntities.register();
 		FabricLifecycleAdapter.register();
 		ViewerParrotCommands.register();
-		M0DebugCommands.register();
 		LOGGER.info("Viewer Parrots: common initialization complete");
 	}
 }

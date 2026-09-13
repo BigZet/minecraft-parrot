@@ -6,6 +6,8 @@
 	"viewerparrots.rename.ok": "Name changed: %s",
 	"viewerparrots.trait.ok": "Trait changed: %s",
 	"viewerparrots.respawn.ok": "Parrot respawned: %s, generation %s",
+	"viewerparrots.action.ok": "%s: command %s accepted",
+	"viewerparrots.action.delayed": "%s: command %s delayed by the LAZY trait for %s ticks",
 	"viewerparrots.reconcile.loaded": "%s is already loaded (%s)",
 	"viewerparrots.reconcile.bound": "%s found and bound in dimension %s",
 	"viewerparrots.reconcile.no_entity": "%s expects no physical instance (%s)",

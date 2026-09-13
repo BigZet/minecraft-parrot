@@ -4,6 +4,7 @@ import io.github.viewerparrots.ViewerParrotsMod;
 import io.github.viewerparrots.api.CommandResult;
 import io.github.viewerparrots.bootstrap.ServerContext;
 import io.github.viewerparrots.diagnostics.ErrorCode;
+import io.github.viewerparrots.domain.DesiredBehavior;
 import io.github.viewerparrots.domain.DisplayName;
 import io.github.viewerparrots.domain.LifecycleState;
 import io.github.viewerparrots.domain.ParrotTrait;
@@ -217,6 +218,32 @@ public final class ViewerParrotService {
 				"viewerparrots.rename.ok", updated ->
 						this.context.loadedIndex().find(viewerId)
 								.ifPresent(parrot -> this.controller.applyName(parrot, updated)));
+	}
+
+	/**
+	 * Фиксирует изменение намерения журналом (раздел 8.2 ТЗ).
+	 *
+	 * <p>Результат не возвращается вызывающему: команда уже сообщила об успехе, а запись
+	 * намерения — фоновая durable-операция. Её провал переводит мод в degraded, но не
+	 * отменяет уже выполненное движение.
+	 */
+	public void recordDesiredBehavior(ViewerId viewerId, DesiredBehavior desiredBehavior) {
+		Optional<ViewerParrotRecord> existing = this.context.registry().find(viewerId);
+		if (existing.isEmpty()) {
+			return;
+		}
+
+		ViewerParrotRecord updated = existing.get()
+				.withDesiredBehavior(desiredBehavior, this.context.clock().now());
+		this.context.registry().replace(updated);
+
+		writeJournal(JournalEntryDto.Phase.COMMIT, UUID.randomUUID(), updated)
+				.exceptionally(error -> {
+					this.context.degrade("намерение не записано: " + error.getMessage());
+					ViewerParrotsMod.LOGGER.error("Намерение {} для {} не записано",
+							desiredBehavior, viewerId, error);
+					return null;
+				});
 	}
 
 	public CompletableFuture<CommandResult> setTrait(UUID commandId, ViewerId viewerId, ParrotTrait trait) {

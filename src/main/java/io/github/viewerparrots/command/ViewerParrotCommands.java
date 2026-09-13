@@ -35,9 +35,8 @@ import java.util.UUID;
  * <p>Дерево фильтруется по правам, но сервис проверяет их повторно: фильтрация Brigadier
  * не распространяется на внутренний Java API (раздел 12 ТЗ).
  *
- * <p>Набор этапа M2: идентичность и жизненный цикл. Команды движения
- * ({@code come}, {@code follow}, {@code sit}, {@code dance}, {@code scream}) появятся на M3
- * вместе с очередью действий и таймерами.
+ * <p>Полный набор раздела 6: идентичность, жизненный цикл и игровые действия.
+ * Весь порядок проверок игровых действий живёт в {@code ParrotCommandService}.
  */
 public final class ViewerParrotCommands {
 	private static final int SUGGESTION_LIMIT = 100;
@@ -126,6 +125,12 @@ public final class ViewerParrotCommands {
 								.executes(ctx -> list(ctx.getSource(),
 										IntegerArgumentType.getInteger(ctx, "page")))))
 
+				.then(gameAction("come", ParrotAction.COME))
+				.then(gameAction("follow", ParrotAction.FOLLOW))
+				.then(gameAction("sit", ParrotAction.SIT))
+				.then(gameAction("dance", ParrotAction.DANCE))
+				.then(gameAction("scream", ParrotAction.SCREAM))
+
 				.then(CommandManager.literal("save")
 						.requires(source -> allowed(source, ParrotAction.SAVE))
 						.executes(ctx -> save(ctx.getSource())))
@@ -133,6 +138,33 @@ public final class ViewerParrotCommands {
 				.then(CommandManager.literal("status")
 						.requires(source -> allowed(source, ParrotAction.STATUS))
 						.executes(ctx -> status(ctx.getSource())));
+	}
+
+	/**
+	 * Игровые действия раздела 6 устроены одинаково, поэтому строятся общим методом:
+	 * весь порядок проверок — права, состояние, лимиты, cooldown — живёт в сервисе,
+	 * а не размазан по узлам дерева команд.
+	 */
+	private static LiteralArgumentBuilder<ServerCommandSource> gameAction(String literal,
+			ParrotAction action) {
+		return CommandManager.literal(literal)
+				.requires(source -> allowed(source, action))
+				.then(viewerIdArgument()
+						.executes(ctx -> runGameAction(ctx, action,
+								StringArgumentType.getString(ctx, "viewerId"))));
+	}
+
+	private static int runGameAction(CommandContext<ServerCommandSource> ctx, ParrotAction action,
+			String rawViewerId) {
+		return withViewerId(ctx, rawViewerId, (context, source, viewerId) -> {
+			ActorContext actor = toActor(source, context);
+			CommandResult result = context.commandService()
+					.submit(UUID.randomUUID(), actor, action, viewerId);
+			CommandFeedback.send(source, result);
+			// Brigadier возвращает 1 при приёме и 0 при синхронном отказе; это не
+			// обещание завершённой записи на диск (раздел 6.2 ТЗ).
+			return result.succeeded() ? 1 : 0;
+		});
 	}
 
 	/**
@@ -174,6 +206,8 @@ public final class ViewerParrotCommands {
 				/viewerparrot create <viewerId> <имя> | remove <viewerId>
 				/viewerparrot rename <viewerId> <имя> | trait <viewerId> <trait>
 				/viewerparrot respawn <viewerId> | reconcile <viewerId>
+				/viewerparrot come <viewerId> | follow <viewerId> | sit <viewerId>
+				/viewerparrot dance <viewerId> | scream <viewerId>
 				/viewerparrot info <viewerId> | list [страница]
 				/viewerparrot save | status"""), false);
 		return 1;
