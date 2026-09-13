@@ -1,6 +1,8 @@
 package io.github.viewerparrots.entity;
 
+import io.github.viewerparrots.ViewerParrotsMod;
 import io.github.viewerparrots.behavior.goal.DanceInPlaceGoal;
+import io.github.viewerparrots.domain.ViewerId;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.attribute.DefaultAttributeContainer;
 import net.minecraft.entity.damage.DamageSource;
@@ -11,10 +13,14 @@ import net.minecraft.entity.passive.ParrotEntity;
 import net.minecraft.entity.passive.PassiveEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.NbtElement;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
 import net.minecraft.world.World;
+
+import java.util.Optional;
 
 /**
  * Попугай-зритель. Наследует полёт, навигацию, модель и текстуры ванильного попугая,
@@ -30,6 +36,16 @@ import net.minecraft.world.World;
 public class ViewerParrotEntity extends ParrotEntity {
 	private static final TrackedData<Boolean> FORCED_DANCING =
 			DataTracker.registerData(ViewerParrotEntity.class, TrackedDataHandlerRegistry.BOOLEAN);
+
+	/** Собственный namespace в NBT, чтобы не пересекаться с ванильными полями попугая. */
+	private static final String MARKER_KEY = ViewerParrotsMod.MOD_ID;
+	private static final String MARKER_SCHEMA_VERSION = "schemaVersion";
+	private static final String MARKER_VIEWER_ID = "viewerId";
+	private static final String MARKER_INCARNATION_ID = "incarnationId";
+	private static final String MARKER_GENERATION = "generation";
+
+	/** {@code null} у сущности без маркера: она не является попугаем зрителя. */
+	private ParrotMarker marker;
 
 	public ViewerParrotEntity(EntityType<? extends ViewerParrotEntity> entityType, World world) {
 		super(entityType, world);
@@ -54,6 +70,57 @@ public class ViewerParrotEntity extends ParrotEntity {
 	protected void initDataTracker(DataTracker.Builder builder) {
 		super.initDataTracker(builder);
 		builder.add(FORCED_DANCING, false);
+	}
+
+	// --- Маркер реестра (раздел 4.3 ТЗ) --------------------------------------
+
+	/**
+	 * Маркер сохраняется в собственном namespace, чтобы не пересекаться с ванильными
+	 * полями попугая и не потеряться при их изменении между версиями игры.
+	 */
+	@Override
+	public void writeCustomDataToNbt(NbtCompound nbt) {
+		super.writeCustomDataToNbt(nbt);
+		if (this.marker == null) {
+			return;
+		}
+		NbtCompound markerNbt = new NbtCompound();
+		markerNbt.putInt(MARKER_SCHEMA_VERSION, this.marker.schemaVersion());
+		markerNbt.putString(MARKER_VIEWER_ID, this.marker.viewerId().value());
+		markerNbt.putUuid(MARKER_INCARNATION_ID, this.marker.incarnationId());
+		markerNbt.putLong(MARKER_GENERATION, this.marker.generation());
+		nbt.put(MARKER_KEY, markerNbt);
+	}
+
+	@Override
+	public void readCustomDataFromNbt(NbtCompound nbt) {
+		super.readCustomDataFromNbt(nbt);
+		this.marker = null;
+		if (!nbt.contains(MARKER_KEY, NbtElement.COMPOUND_TYPE)) {
+			return;
+		}
+		NbtCompound markerNbt = nbt.getCompound(MARKER_KEY);
+		try {
+			this.marker = new ParrotMarker(
+					markerNbt.getInt(MARKER_SCHEMA_VERSION),
+					ViewerId.of(markerNbt.getString(MARKER_VIEWER_ID)),
+					markerNbt.getUuid(MARKER_INCARNATION_ID),
+					markerNbt.getLong(MARKER_GENERATION));
+		} catch (RuntimeException e) {
+			// Испорченный маркер не должен ронять загрузку чанка: сущность просто
+			// останется неопознанной и будет отвергнута валидатором.
+			ViewerParrotsMod.LOGGER.warn("Повреждённый маркер у сущности {}: {}", getUuid(), e.toString());
+			this.marker = null;
+		}
+	}
+
+	public Optional<ParrotMarker> marker() {
+		return Optional.ofNullable(this.marker);
+	}
+
+	/** Проставляется контроллером при создании и замене экземпляра. */
+	public void setMarker(ParrotMarker marker) {
+		this.marker = marker;
 	}
 
 	/** Сервер — единственный источник истины для флага танца. */

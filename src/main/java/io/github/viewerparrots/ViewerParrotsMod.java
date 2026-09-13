@@ -1,6 +1,8 @@
 package io.github.viewerparrots;
 
+import io.github.viewerparrots.bootstrap.FabricLifecycleAdapter;
 import io.github.viewerparrots.command.M0DebugCommands;
+import io.github.viewerparrots.command.ViewerParrotCommands;
 import io.github.viewerparrots.entity.ModEntities;
 import net.fabricmc.api.ModInitializer;
 import net.minecraft.util.Identifier;
@@ -22,6 +24,8 @@ public class ViewerParrotsMod implements ModInitializer {
 	@Override
 	public void onInitialize() {
 		ModEntities.register();
+		FabricLifecycleAdapter.register();
+		ViewerParrotCommands.register();
 		M0DebugCommands.register();
 		LOGGER.info("Viewer Parrots: common initialization complete");
 	}
