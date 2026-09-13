@@ -9,6 +9,7 @@
 	"viewerparrots.reconcile.loaded": "%s уже загружен (%s)",
 	"viewerparrots.reconcile.bound": "%s найден и привязан в измерении %s",
 	"viewerparrots.reconcile.no_entity": "%s не ожидает физического экземпляра (%s)",
+	"viewerparrots.reconcile.searching": "%s: идёт ограниченный поиск, до %s тиков",
 	"viewerparrots.reconcile.not_found": "%s не найден в известной позиции (%s)",
 
 	"viewerparrots.error.permission_denied": "Недостаточно прав",

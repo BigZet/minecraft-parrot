@@ -32,6 +32,11 @@ public final class CheckpointScheduler {
 			return;
 		}
 
+		// Без изменений писать нечего: раздел 8.2 говорит «каждые 30 секунд при dirty».
+		if (!context.registry().isDirty()) {
+			return;
+		}
+
 		long interval = context.config().storage().checkpointIntervalTicks();
 		long now = context.clock().currentTick();
 		if (now - lastCheckpointTick < interval) {
@@ -63,6 +68,8 @@ public final class CheckpointScheduler {
 						ViewerParrotsMod.LOGGER.error("Checkpoint не выполнен", error);
 						return;
 					}
+					// Снимок записан и отражает реестр на момент сборки копий.
+					context.registry().markClean();
 					for (String warning : result.warnings()) {
 						ViewerParrotsMod.LOGGER.warn("Checkpoint: {}", warning);
 					}

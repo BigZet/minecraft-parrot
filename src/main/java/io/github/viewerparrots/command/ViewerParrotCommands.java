@@ -416,6 +416,10 @@ public final class ViewerParrotCommands {
 						+ " из " + context.config().maxActiveParrots(),
 				"незавершённых резервов: " + context.registry().pendingReservations(),
 				"надгробий: " + context.registry().tombstones().size(),
+				"recovery-заданий: " + context.recoveryService().activeJobs()
+						+ " из " + Math.min(io.github.viewerparrots.lifecycle.EntityRecoveryService
+						.MAX_CONCURRENT_JOBS, context.config().recovery().maxConcurrentJobs()),
+				"изменения не в снимке: " + context.registry().isDirty(),
 				"checkpoint: " + context.repository().checkpointSequence(),
 				"стример: " + context.streamerService().configuredUuid()
 						.map(UUID::toString).orElse("не назначен"))), false);

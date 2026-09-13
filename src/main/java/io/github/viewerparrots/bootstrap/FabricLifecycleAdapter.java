@@ -84,6 +84,13 @@ public final class FabricLifecycleAdapter {
 		}
 		ServerContext context = maybeContext.get();
 
+		if (parrot.isAwaitingAuthorization()) {
+			// Сущность только что создана контроллером: запись попадёт в реестр после
+			// durable COMMIT, и привяжет её сам сервис. Валидировать её сейчас нельзя —
+			// в реестре её ещё нет, и проверка отвергла бы только что созданного попугая.
+			return;
+		}
+
 		GenerationValidator.Decision decision = GenerationValidator.decide(
 				parrot.marker(), parrot.getUuid(), context.registry(), context.isRegistryReady());
 
@@ -171,6 +178,9 @@ public final class FabricLifecycleAdapter {
 	}
 
 	private static void onEndTick(MinecraftServer server) {
-		ServerContext.current().ifPresent(CheckpointScheduler::tick);
+		ServerContext.current().ifPresent(context -> {
+			context.recoveryService().tick();
+			CheckpointScheduler.tick(context);
+		});
 	}
 }

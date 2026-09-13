@@ -47,6 +47,17 @@ public class ViewerParrotEntity extends ParrotEntity {
 	/** {@code null} у сущности без маркера: она не является попугаем зрителя. */
 	private ParrotMarker marker;
 
+	/**
+	 * Сущность создана контроллером и ждёт durable COMMIT.
+	 *
+	 * <p>Поле намеренно не сохраняется в NBT и живёт только в памяти. Событие загрузки
+	 * сущности срабатывает внутри {@code spawnEntity}, то есть раньше, чем запись попадает
+	 * в реестр; без этого признака валидатор отверг бы только что созданного попугая.
+	 * А после рестарта признака нет — и подготовленная, но не подтверждённая сущность
+	 * будет отвергнута, как и требует откат незавершённого PREPARE.
+	 */
+	private transient boolean awaitingAuthorization;
+
 	public ViewerParrotEntity(EntityType<? extends ViewerParrotEntity> entityType, World world) {
 		super(entityType, world);
 	}
@@ -121,6 +132,14 @@ public class ViewerParrotEntity extends ParrotEntity {
 	/** Проставляется контроллером при создании и замене экземпляра. */
 	public void setMarker(ParrotMarker marker) {
 		this.marker = marker;
+	}
+
+	public boolean isAwaitingAuthorization() {
+		return this.awaitingAuthorization;
+	}
+
+	public void setAwaitingAuthorization(boolean awaiting) {
+		this.awaitingAuthorization = awaiting;
 	}
 
 	/** Сервер — единственный источник истины для флага танца. */

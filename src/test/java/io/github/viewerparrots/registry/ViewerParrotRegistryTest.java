@@ -237,6 +237,38 @@ class ViewerParrotRegistryTest {
 	}
 
 	@Test
+	void startsCleanAndBecomesDirtyOnEveryMutation() {
+		// Регрессия: checkpoint писался каждый интервал независимо от изменений,
+		// хотя раздел 8.2 требует писать его «при dirty».
+		assertFalse(this.registry.isDirty(), "пустой реестр изменений не содержит");
+
+		this.registry.put(record("viewer1"));
+		assertTrue(this.registry.isDirty());
+
+		this.registry.markClean();
+		assertFalse(this.registry.isDirty());
+
+		ViewerParrotRecord stored = this.registry.find(ViewerId.of("viewer1")).orElseThrow();
+		this.registry.replace(stored.withTrait(ParrotTrait.LOUD, NOW));
+		assertTrue(this.registry.isDirty());
+
+		this.registry.markClean();
+		this.registry.setStreamerPlayerUuid(UUID.randomUUID());
+		assertTrue(this.registry.isDirty());
+
+		this.registry.markClean();
+		this.registry.remove(ViewerId.of("viewer1"), NOW);
+		assertTrue(this.registry.isDirty());
+	}
+
+	@Test
+	void loadedSnapshotIsNotDirty() {
+		this.registry.replaceAll(List.of(record("viewer1")), List.of(), UUID.randomUUID());
+		// Только что прочитанный реестр совпадает со снимком: писать его заново незачем.
+		assertFalse(this.registry.isDirty());
+	}
+
+	@Test
 	void replaceAllRebuildsIndexesAndClearsReservations() {
 		this.registry.reserveSlot(MAX_ACTIVE);
 		this.registry.put(record("stale"));

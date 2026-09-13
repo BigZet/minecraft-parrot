@@ -2,6 +2,7 @@ package io.github.viewerparrots.api;
 
 import io.github.viewerparrots.diagnostics.ErrorCode;
 
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -23,7 +24,9 @@ public record CommandResult(
 	public CommandResult {
 		Objects.requireNonNull(commandId, "commandId");
 		Objects.requireNonNull(status, "status");
-		details = Map.copyOf(details);
+		// Порядок важен: значения подставляются в локализованное сообщение позиционно,
+		// а Map.copyOf порядок обхода не сохраняет и перемешал бы аргументы.
+		details = Collections.unmodifiableMap(new LinkedHashMap<>(details));
 		if (status == CommandStatus.SUCCEEDED && code != null) {
 			throw new IllegalArgumentException("успешный результат не может нести код ошибки " + code);
 		}
@@ -45,6 +48,24 @@ public record CommandResult(
 
 	public static CommandResult succeeded(UUID commandId, String messageKey, Map<String, String> details) {
 		return new CommandResult(commandId, CommandStatus.SUCCEEDED, null, messageKey, details, 0L);
+	}
+
+	/**
+	 * Детали с гарантированным порядком. Вызывающие не должны использовать {@code Map.of}:
+	 * его порядок обхода не определён, а значения подставляются в сообщение позиционно.
+	 *
+	 * @param keyValuePairs чередующиеся ключ и значение
+	 */
+	public static Map<String, String> details(String... keyValuePairs) {
+		if (keyValuePairs.length % 2 != 0) {
+			throw new IllegalArgumentException("ожидались пары ключ-значение, получено "
+					+ keyValuePairs.length + " элементов");
+		}
+		Map<String, String> details = new LinkedHashMap<>();
+		for (int i = 0; i < keyValuePairs.length; i += 2) {
+			details.put(keyValuePairs[i], keyValuePairs[i + 1]);
+		}
+		return details;
 	}
 
 	public static CommandResult rejected(UUID commandId, ErrorCode code) {

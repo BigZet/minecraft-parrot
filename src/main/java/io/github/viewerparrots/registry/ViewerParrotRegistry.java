@@ -36,6 +36,12 @@ public final class ViewerParrotRegistry {
 	/** Слоты, зарезервированные под ещё не завершённый spawn (раздел 9.5 ТЗ). */
 	private int pendingReservations;
 
+	/**
+	 * Есть ли изменения, не попавшие в снимок. Раздел 8.2 требует писать checkpoint
+	 * каждые 30 секунд именно при dirty, а не безусловно.
+	 */
+	private boolean dirty;
+
 	public Optional<ViewerParrotRecord> find(ViewerId viewerId) {
 		return Optional.ofNullable(this.records.get(viewerId));
 	}
@@ -72,6 +78,7 @@ public final class ViewerParrotRegistry {
 		checkEntityUuidFree(record, viewerId);
 		this.records.put(viewerId, record);
 		record.expectedEntityUuid().ifPresent(uuid -> this.byEntityUuid.put(uuid, viewerId));
+		this.dirty = true;
 	}
 
 	/**
@@ -99,6 +106,7 @@ public final class ViewerParrotRegistry {
 		existing.expectedEntityUuid().ifPresent(this.byEntityUuid::remove);
 		this.records.put(viewerId, updated);
 		updated.expectedEntityUuid().ifPresent(uuid -> this.byEntityUuid.put(uuid, viewerId));
+		this.dirty = true;
 	}
 
 	/**
@@ -113,6 +121,7 @@ public final class ViewerParrotRegistry {
 		}
 		existing.expectedEntityUuid().ifPresent(this.byEntityUuid::remove);
 		Tombstone tombstone = Tombstone.of(existing, removedAt);
+		this.dirty = true;
 		this.tombstonesByIncarnation.put(tombstone.incarnationId(), tombstone);
 		return Optional.of(tombstone);
 	}
@@ -120,6 +129,7 @@ public final class ViewerParrotRegistry {
 	public void addTombstone(Tombstone tombstone) {
 		Objects.requireNonNull(tombstone, "tombstone");
 		this.tombstonesByIncarnation.put(tombstone.incarnationId(), tombstone);
+		this.dirty = true;
 	}
 
 	/**
@@ -187,6 +197,17 @@ public final class ViewerParrotRegistry {
 		return this.pendingReservations;
 	}
 
+	// --- Отслеживание изменений ---------------------------------------------
+
+	public boolean isDirty() {
+		return this.dirty;
+	}
+
+	/** Вызывается после успешного checkpoint: снимок теперь отражает реестр. */
+	public void markClean() {
+		this.dirty = false;
+	}
+
 	// --- Целевой стример ----------------------------------------------------
 
 	public Optional<UUID> streamerPlayerUuid() {
@@ -195,6 +216,7 @@ public final class ViewerParrotRegistry {
 
 	public void setStreamerPlayerUuid(UUID playerUuid) {
 		this.streamerPlayerUuid = playerUuid;
+		this.dirty = true;
 	}
 
 	/** Полная замена содержимого после загрузки снимка и replay журнала. */
@@ -212,6 +234,8 @@ public final class ViewerParrotRegistry {
 		for (Tombstone tombstone : loadedTombstones) {
 			addTombstone(tombstone);
 		}
+		// Только что загруженный реестр совпадает со снимком.
+		this.dirty = false;
 	}
 
 	private void checkEntityUuidFree(ViewerParrotRecord record, ViewerId viewerId) {

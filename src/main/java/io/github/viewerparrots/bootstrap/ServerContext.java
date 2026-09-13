@@ -5,6 +5,7 @@ import io.github.viewerparrots.config.ConfigLoader;
 import io.github.viewerparrots.config.ConfigValidator;
 import io.github.viewerparrots.config.ViewerParrotsConfig;
 import io.github.viewerparrots.entity.SafePositionFinder;
+import io.github.viewerparrots.lifecycle.EntityRecoveryService;
 import io.github.viewerparrots.ratelimit.CooldownService;
 import io.github.viewerparrots.ratelimit.GlobalRateLimiter;
 import io.github.viewerparrots.registry.LoadedEntityIndex;
@@ -59,6 +60,7 @@ public final class ServerContext {
 	private JsonParrotRepository repository;
 	private StreamerService streamerService;
 	private ViewerParrotService parrotService;
+	private EntityRecoveryService recoveryService;
 
 	private StorageHealth storageHealth = StorageHealth.LOADING;
 	private String storageFaultReason;
@@ -124,6 +126,7 @@ public final class ServerContext {
 
 		this.streamerService = new StreamerService(this.server, this.registry);
 		this.parrotService = new ViewerParrotService(this);
+		this.recoveryService = new EntityRecoveryService(this);
 	}
 
 	private void loadRegistry() {
@@ -160,6 +163,7 @@ public final class ServerContext {
 	}
 
 	private void shutdown() {
+		this.recoveryService.cancelAll();
 		// Приём команд прекращается вместе с контекстом; ждём writer в пределах таймаута.
 		boolean drained = this.writer.shutdownAndAwait(this.config.storage().shutdownTimeoutSeconds());
 		if (!drained) {
@@ -231,6 +235,10 @@ public final class ServerContext {
 
 	public ViewerParrotService parrotService() {
 		return this.parrotService;
+	}
+
+	public EntityRecoveryService recoveryService() {
+		return this.recoveryService;
 	}
 
 	public StorageHealth storageHealth() {

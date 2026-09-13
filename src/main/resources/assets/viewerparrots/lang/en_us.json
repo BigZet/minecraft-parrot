@@ -9,6 +9,7 @@
 	"viewerparrots.reconcile.loaded": "%s is already loaded (%s)",
 	"viewerparrots.reconcile.bound": "%s found and bound in dimension %s",
 	"viewerparrots.reconcile.no_entity": "%s expects no physical instance (%s)",
+	"viewerparrots.reconcile.searching": "%s: limited search running, up to %s ticks",
 	"viewerparrots.reconcile.not_found": "%s not found at its known location (%s)",
 
 	"viewerparrots.error.permission_denied": "Insufficient permissions",

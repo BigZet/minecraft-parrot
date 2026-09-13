@@ -46,6 +46,8 @@ public final class ParrotEntityController {
 		parrot.setMarker(ParrotMarker.of(record));
 		parrot.setPersistent();
 		parrot.setAiDisabled(true);
+		// Признак выставляется ДО spawnEntity: событие загрузки срабатывает внутри него.
+		parrot.setAwaitingAuthorization(true);
 		applyName(parrot, record);
 
 		if (!world.spawnEntity(parrot)) {
@@ -58,6 +60,7 @@ public final class ParrotEntityController {
 
 	/** Включает поведение после durable COMMIT. */
 	public void authorize(ViewerParrotEntity parrot) {
+		parrot.setAwaitingAuthorization(false);
 		parrot.setAiDisabled(false);
 	}
 

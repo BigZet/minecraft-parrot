@@ -15,6 +15,7 @@ import io.github.viewerparrots.domain.ViewerId;
 import io.github.viewerparrots.domain.ViewerParrotRecord;
 import io.github.viewerparrots.entity.ParrotEntityController;
 import io.github.viewerparrots.entity.ViewerParrotEntity;
+import io.github.viewerparrots.lifecycle.EntityRecoveryService;
 import io.github.viewerparrots.storage.DtoMapper;
 import io.github.viewerparrots.storage.dto.JournalEntryDto;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -142,7 +143,7 @@ public final class ViewerParrotService {
 							committed.viewerId(), committed.incarnationId(),
 							committed.generation(), entityUuid);
 					return CommandResult.succeeded(commandId, "viewerparrots.create.ok",
-							Map.of("viewerId", committed.viewerId().value(),
+							CommandResult.details("viewerId", committed.viewerId().value(),
 									"variant", committed.variant().name(),
 									"trait", committed.trait().name()));
 				})
@@ -200,7 +201,7 @@ public final class ViewerParrotService {
 					ViewerParrotsMod.LOGGER.info("remove viewerId={} incarnation={} generation={}",
 							viewerId, record.incarnationId(), record.generation());
 					return CommandResult.succeeded(commandId, "viewerparrots.remove.ok",
-							Map.of("viewerId", viewerId.value()));
+							CommandResult.details("viewerId", viewerId.value()));
 				})
 				.exceptionally(error -> {
 					this.context.degrade("tombstone не записан: " + error.getMessage());
@@ -248,7 +249,7 @@ public final class ViewerParrotService {
 					this.context.registry().replace(updated);
 					afterCommit.accept(updated);
 					return CommandResult.succeeded(commandId, messageKey,
-							Map.of("viewerId", viewerId.value()));
+							CommandResult.details("viewerId", viewerId.value()));
 				})
 				.exceptionally(error -> {
 					this.context.degrade("операция не записана: " + error.getMessage());
@@ -279,6 +280,9 @@ public final class ViewerParrotService {
 		}
 		if (record.physicalStatus() == PhysicalStatus.PRESENT) {
 			// UNRESOLVED и UNLOADED сначала должны завершить поиск (раздел 9.4 ТЗ).
+			// Поиск запускается здесь же, иначе запись навсегда осталась бы PRESENT
+			// и respawn стал бы недостижим.
+			this.context.recoveryService().start(viewerId);
 			return completed(CommandResult.rejected(commandId, ErrorCode.ENTITY_UNRESOLVED));
 		}
 
@@ -343,7 +347,7 @@ public final class ViewerParrotService {
 					ViewerParrotsMod.LOGGER.info("respawn viewerId={} generation={} entity={}",
 							committed.viewerId(), committed.generation(), newEntityUuid);
 					return CommandResult.succeeded(commandId, "viewerparrots.respawn.ok",
-							Map.of("viewerId", committed.viewerId().value(),
+							CommandResult.details("viewerId", committed.viewerId().value(),
 									"generation", Long.toString(committed.generation())));
 				})
 				.exceptionally(error -> {
@@ -382,27 +386,41 @@ public final class ViewerParrotService {
 
 		if (this.context.loadedIndex().isLoaded(viewerId)) {
 			return CommandResult.succeeded(commandId, "viewerparrots.reconcile.loaded",
-					Map.of("viewerId", viewerId.value(), "state", LifecycleState.LOADED.name()));
+					CommandResult.details("viewerId", viewerId.value(), "state", LifecycleState.LOADED.name()));
 		}
 
 		Optional<UUID> expected = record.expectedEntityUuid();
 		if (expected.isEmpty()) {
 			return CommandResult.succeeded(commandId, "viewerparrots.reconcile.no_entity",
-					Map.of("viewerId", viewerId.value(), "status", record.physicalStatus().name()));
+					CommandResult.details("viewerId", viewerId.value(), "status", record.physicalStatus().name()));
 		}
 
 		for (ServerWorld world : this.context.server().getWorlds()) {
 			if (world.getEntity(expected.get()) instanceof ViewerParrotEntity found) {
 				this.context.loadedIndex().bind(viewerId, found);
 				return CommandResult.succeeded(commandId, "viewerparrots.reconcile.bound",
-						Map.of("viewerId", viewerId.value(),
+						CommandResult.details("viewerId", viewerId.value(),
 								"dimension", world.getRegistryKey().getValue().toString()));
 			}
 		}
 
-		// Локальное свидетельство, а не доказательство отсутствия во всём мире.
-		return CommandResult.succeeded(commandId, "viewerparrots.reconcile.not_found",
-				Map.of("viewerId", viewerId.value(), "reason", "NOT_FOUND_IN_KNOWN_LOCATION"));
+		// В загруженных мирах сущности нет: остаётся ограниченный поиск с временной
+		// загрузкой одного чанка последней известной позиции.
+		EntityRecoveryService.StartResult started = this.context.recoveryService().start(viewerId);
+		return switch (started) {
+			case FOUND_IMMEDIATELY -> CommandResult.succeeded(commandId, "viewerparrots.reconcile.bound",
+					CommandResult.details("viewerId", viewerId.value(), "dimension", "loaded"));
+			case STARTED, ALREADY_RUNNING -> CommandResult.succeeded(commandId,
+					"viewerparrots.reconcile.searching",
+					CommandResult.details("viewerId", viewerId.value(),
+							"timeoutTicks", Integer.toString(this.context.config().recovery().timeoutTicks())));
+			case BUSY -> CommandResult.rejected(commandId, ErrorCode.SERVER_BUSY);
+			// Поиск уже завершён отрицательно и запись переведена в MISSING.
+			case NO_KNOWN_LOCATION, NOTHING_TO_FIND -> CommandResult.succeeded(commandId,
+					"viewerparrots.reconcile.not_found",
+					CommandResult.details("viewerId", viewerId.value(),
+							"reason", EntityRecoveryService.NOT_FOUND_REASON));
+		};
 	}
 
 	// --- журнал ----------------------------------------------------------------
