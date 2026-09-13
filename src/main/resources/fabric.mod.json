@@ -1,0 +1,32 @@
+{
+	"schemaVersion": 1,
+	"id": "viewerparrots",
+	"version": "${version}",
+	"name": "Viewer Parrots",
+	"description": "Персональный попугай-зритель с постоянной идентичностью, характером и управляемым поведением.",
+	"authors": [],
+	"contact": {},
+	"license": "GPL-3.0-only",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"io.github.viewerparrots.ViewerParrotsMod"
+		],
+		"client": [
+			"io.github.viewerparrots.client.ViewerParrotsClient"
+		]
+	},
+	"mixins": [
+		"viewerparrots.mixins.json",
+		{
+			"config": "viewerparrots.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=${loader_version}",
+		"minecraft": "${minecraft_version}",
+		"java": ">=21",
+		"fabric-api": "*"
+	}
+}
