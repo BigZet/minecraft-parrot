@@ -1,9 +1,8 @@
 package io.github.viewerparrots.behavior.goal;
 
+import io.github.viewerparrots.entity.SafePositionFinder;
 import io.github.viewerparrots.entity.ViewerParrotEntity;
-import net.minecraft.block.BlockState;
 import net.minecraft.entity.ai.goal.Goal;
-import net.minecraft.util.math.BlockPos;
 
 import java.util.EnumSet;
 
@@ -23,7 +22,7 @@ import java.util.EnumSet;
  */
 public class DanceInPlaceGoal extends Goal {
 	/** Насколько глубоко искать опору под попугаем. */
-	public static final int SUPPORT_SCAN_DEPTH = 8;
+	public static final int SUPPORT_SCAN_DEPTH = SafePositionFinder.SUPPORT_SCAN_DEPTH;
 
 	private final ViewerParrotEntity parrot;
 
@@ -76,19 +75,7 @@ public class DanceInPlaceGoal extends Goal {
 	}
 
 	private boolean hasSupportBelow() {
-		BlockPos from = this.parrot.getBlockPos();
-		int bottom = this.parrot.getWorld().getBottomY();
-
-		for (int offset = 1; offset <= SUPPORT_SCAN_DEPTH; offset++) {
-			BlockPos pos = from.down(offset);
-			if (pos.getY() < bottom) {
-				return false;
-			}
-			BlockState state = this.parrot.getWorld().getBlockState(pos);
-			if (state.isSolidBlock(this.parrot.getWorld(), pos)) {
-				return true;
-			}
-		}
-		return false;
+		return SafePositionFinder.hasSupportBelow(
+				this.parrot.getWorld(), this.parrot.getBlockPos(), SUPPORT_SCAN_DEPTH);
 	}
 }

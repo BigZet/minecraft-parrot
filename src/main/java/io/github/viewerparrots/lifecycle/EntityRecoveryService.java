@@ -154,7 +154,7 @@ public final class EntityRecoveryService {
 			if (bindIfLoadedAnywhere(viewerId, job.expectedEntityUuid)) {
 				release(job);
 				iterator.remove();
-				ViewerParrotsMod.LOGGER.debug("recovery found viewerId={}", viewerId);
+				ViewerParrotsMod.LOGGER.info("recovery итог: viewerId={} найден и привязан", viewerId);
 				continue;
 			}
 

@@ -6,6 +6,7 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.World;
 
 import java.util.Optional;
 import java.util.Random;
@@ -25,6 +26,8 @@ public final class SafePositionFinder {
 	public static final int MAX_CANDIDATES = 32;
 	public static final int MIN_RADIUS = 2;
 	public static final int MAX_RADIUS = 6;
+	/** Насколько глубоко искать опору под кандидатом. */
+	public static final int SUPPORT_SCAN_DEPTH = 8;
 
 	/** Габариты попугая; совпадают с зарегистрированными в {@link ModEntities}. */
 	private static final double WIDTH = 0.5;
@@ -81,8 +84,34 @@ public final class SafePositionFinder {
 		if (isHazardous(world.getBlockState(pos))) {
 			return false;
 		}
-		// Опора под ногами тоже не должна быть опасной: попугай на неё сядет.
-		return !isHazardous(world.getBlockState(pos.down()));
+		// Опора под ногами не должна быть опасной: попугай на неё сядет.
+		if (isHazardous(world.getBlockState(pos.down()))) {
+			return false;
+		}
+		// И опора обязана вообще существовать. Пустота формально не «опасный блок»,
+		// но попугай, оставленный над ней, рано или поздно выпадет из мира — это
+		// и произошло при проверке в игре.
+		return hasSupportBelow(world, pos, SUPPORT_SCAN_DEPTH);
+	}
+
+	/**
+	 * Есть ли твёрдая опора под позицией в пределах заданной глубины.
+	 *
+	 * <p>Общая проверка для спавна и для удержания высоты во время танца: обе решают
+	 * один вопрос — можно ли безопасно снижаться.
+	 */
+	public static boolean hasSupportBelow(World world, BlockPos from, int depth) {
+		int bottom = world.getBottomY();
+		for (int offset = 1; offset <= depth; offset++) {
+			BlockPos pos = from.down(offset);
+			if (pos.getY() < bottom) {
+				return false;
+			}
+			if (world.getBlockState(pos).isSolidBlock(world, pos)) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private static boolean isHazardous(BlockState state) {
