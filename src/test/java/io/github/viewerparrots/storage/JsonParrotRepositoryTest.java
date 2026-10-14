@@ -31,6 +31,164 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Плюс аварийные сценарии раздела 8.3, воспроизводимые без запуска сервера.
  */
 class JsonParrotRepositoryTest {
+	@Test
+	void invalidUtf8PrimaryRestoresValidBackup(@TempDir Path dir) throws IOException {
+		ViewerParrotRecord original = record("backup-viewer", UUID.randomUUID());
+		JsonParrotRepository repository = new JsonParrotRepository(dir);
+		repository.load();
+		repository.checkpoint(List.of(original), List.of(), null);
+		repository.checkpoint(List.of(original), List.of(), null);
+		repository.close();
+		Files.write(dir.resolve(JsonParrotRepository.SNAPSHOT_FILE), new byte[] {'{', (byte) 0xff, '}'});
+		ParrotRepository.LoadResult recovered = reload(dir);
+		assertEquals(List.of(original), recovered.records());
+		assertTrue(recovered.restoredFromBackup());
+		assertTrue(recovered.warnings().stream().anyMatch(warning -> warning.contains("резервная копия")));
+	}
+
+	@Test
+	void olderGenerationDeathCannotOverwriteCommittedReplacement(@TempDir Path dir) throws IOException {
+		ViewerParrotRecord original = record("viewer", UUID.randomUUID());
+		ViewerParrotRecord replacement = original.asRespawned(UUID.randomUUID(), NOW.plusSeconds(1));
+		JsonParrotRepository repository = new JsonParrotRepository(dir);
+		repository.load();
+		repository.checkpoint(List.of(original), List.of(), null);
+		repository.appendJournal(commit(1, UUID.randomUUID(), replacement));
+		repository.appendJournal(commit(2, UUID.randomUUID(), original.asDead(NOW.plusSeconds(2))));
+		repository.close();
+		assertEquals(List.of(replacement), reload(dir).records());
+	}
+
+	@Test
+	void validSameGenerationDeathWinsEvenWithEqualRevision(@TempDir Path dir) throws IOException {
+		ViewerParrotRecord original = record("viewer", UUID.randomUUID());
+		ViewerParrotRecord renamed = original.withDisplayName(io.github.viewerparrots.domain.DisplayName.of("Pending name"), NOW);
+		ViewerParrotRecord death = original.asDead(NOW.plusSeconds(1));
+		assertEquals(renamed.revision(), death.revision());
+		JsonParrotRepository repository = new JsonParrotRepository(dir);
+		repository.load();
+		repository.appendJournal(commit(1, UUID.randomUUID(), renamed));
+		repository.appendJournal(commit(2, UUID.randomUUID(), death));
+		repository.close();
+		assertEquals(List.of(death), reload(dir).records());
+	}
+
+	@Test
+	void sameGenerationLateAlivePayloadCannotResurrectDeath(@TempDir Path dir) throws IOException {
+		ViewerParrotRecord original = record("viewer", UUID.randomUUID());
+		ViewerParrotRecord death = original.asDead(NOW);
+		JsonParrotRepository repository = new JsonParrotRepository(dir);
+		repository.load();
+		repository.appendJournal(commit(1, UUID.randomUUID(), death));
+		repository.appendJournal(commit(2, UUID.randomUUID(), original.withDesiredBehavior(
+				io.github.viewerparrots.domain.DesiredBehavior.FOLLOWING, NOW.plusSeconds(1))));
+		repository.close();
+		assertEquals(List.of(death), reload(dir).records());
+	}
+
+	@Test
+	void tombstonedIncarnationCannotReplayOverNewRegistration(@TempDir Path dir) throws IOException {
+		ViewerParrotRecord old = record("viewer", UUID.randomUUID());
+		ViewerParrotRecord fresh = record("viewer", UUID.randomUUID());
+		JsonParrotRepository repository = new JsonParrotRepository(dir);
+		repository.load();
+		repository.appendJournal(commit(1, UUID.randomUUID(), old));
+		repository.appendJournal(commitTombstone(2, UUID.randomUUID(), Tombstone.of(old, NOW)));
+		repository.appendJournal(commit(3, UUID.randomUUID(), fresh));
+		repository.appendJournal(commit(4, UUID.randomUUID(), old.withTrait(ParrotTrait.LOUD, NOW.plusSeconds(1))));
+		repository.close();
+		assertEquals(List.of(fresh), reload(dir).records());
+	}
+
+	@Test
+	void oldTombstoneCannotRemoveDifferentCurrentIncarnation(@TempDir Path dir) throws IOException {
+		ViewerParrotRecord old = record("viewer", UUID.randomUUID());
+		ViewerParrotRecord fresh = record("viewer", UUID.randomUUID());
+		JsonParrotRepository repository = new JsonParrotRepository(dir);
+		repository.load();
+		repository.checkpoint(List.of(fresh), List.of(Tombstone.of(old, NOW)), null);
+		repository.appendJournal(commitTombstone(1, UUID.randomUUID(), Tombstone.of(old, NOW.plusSeconds(1))));
+		repository.close();
+		assertEquals(List.of(fresh), reload(dir).records());
+	}
+
+	@Test
+	void conflictingIncarnationWithoutRemovalIsStorageFault(@TempDir Path dir) throws IOException {
+		ViewerParrotRecord first = record("viewer", UUID.randomUUID());
+		JsonParrotRepository repository = new JsonParrotRepository(dir);
+		repository.load();
+		repository.appendJournal(commit(1, UUID.randomUUID(), first));
+		repository.appendJournal(commit(2, UUID.randomUUID(), record("viewer", UUID.randomUUID())));
+		repository.close();
+		assertThrows(StorageFaultException.class, () -> reload(dir));
+	}
+
+	@Test
+	void completeChecksumCorruptionWithoutNewlineIsStorageFault(@TempDir Path dir) throws IOException {
+		var json = com.google.gson.JsonParser.parseString(JournalCodec.write(
+				commit(1, UUID.randomUUID(), record("viewer", UUID.randomUUID())))).getAsJsonObject();
+		json.addProperty("checksum", "0".repeat(64));
+		Files.writeString(dir.resolve(JsonParrotRepository.JOURNAL_FILE), json.toString(), StandardCharsets.UTF_8);
+		assertThrows(StorageFaultException.class, () -> reload(dir));
+	}
+
+	@Test
+	void completeUnknownEnumWithoutNewlineIsStorageFault(@TempDir Path dir) throws IOException {
+		var json = com.google.gson.JsonParser.parseString(JournalCodec.write(
+				commit(1, UUID.randomUUID(), record("viewer", UUID.randomUUID())))).getAsJsonObject();
+		json.getAsJsonObject("record").addProperty("trait", "UNKNOWN");
+		json.addProperty("checksum", io.github.viewerparrots.json.CanonicalJson.checksum(json));
+		Files.writeString(dir.resolve(JsonParrotRepository.JOURNAL_FILE), json.toString(), StandardCharsets.UTF_8);
+		assertThrows(StorageFaultException.class, () -> reload(dir));
+	}
+
+	@Test
+	void malformedUtf8InCompleteFinalRecordIsStorageFault(@TempDir Path dir) throws IOException {
+		byte[] bytes = JournalCodec.write(commit(1, UUID.randomUUID(), record("viewer", UUID.randomUUID()))).getBytes(StandardCharsets.UTF_8);
+		for (int i = 0; i < bytes.length; i++) {
+			if (bytes[i] == 'v') { bytes[i] = (byte) 0xff; break; }
+		}
+		Files.write(dir.resolve(JsonParrotRepository.JOURNAL_FILE), bytes);
+		assertThrows(StorageFaultException.class, () -> reload(dir));
+	}
+	@Test
+	void checkpointAfterBackupRecoveryPreservesValidBackup(@TempDir Path dir) throws IOException {
+		JsonParrotRepository repository = new JsonParrotRepository(dir);
+		repository.load();
+		ViewerParrotRecord original = record("backup-viewer", UUID.randomUUID());
+		repository.checkpoint(List.of(original), List.of(), null);
+		repository.checkpoint(List.of(original), List.of(), null);
+		repository.close();
+		Path primary = dir.resolve(JsonParrotRepository.SNAPSHOT_FILE);
+		Files.writeString(primary, "{broken", StandardCharsets.UTF_8);
+		JsonParrotRepository recovered = new JsonParrotRepository(dir);
+		assertTrue(recovered.load().restoredFromBackup());
+		recovered.checkpoint(List.of(original), List.of(), null);
+		recovered.close();
+		Files.writeString(primary, "{broken again", StandardCharsets.UTF_8);
+		assertEquals(List.of(original), reload(dir).records());
+	}
+	@Test
+	void checkpointDoesNotHideCommitAwaitingServerCallback(@TempDir Path dir) throws IOException {
+		JsonParrotRepository repository = new JsonParrotRepository(dir);
+		repository.load();
+		ViewerParrotRecord committed = record("viewer", UUID.randomUUID());
+		repository.appendJournal(commit(1, UUID.randomUUID(), committed));
+		repository.checkpointAtSequence(List.of(), List.of(), null, 0);
+		repository.close();
+		assertEquals(List.of(committed), reload(dir).records());
+	}
+
+	@Test
+	void targetAssignmentIsDurableWithoutCheckpoint(@TempDir Path dir) throws IOException {
+		JsonParrotRepository repository = new JsonParrotRepository(dir);
+		repository.load();
+		UUID target = UUID.randomUUID();
+		repository.appendJournal(new JournalEntryDto(1, 1, UUID.randomUUID(), JournalEntryDto.Phase.COMMIT,
+				"__streamer__", null, 0, null, null, target, null));
+		repository.close();
+		assertEquals(target, reload(dir).streamerPlayerUuid());
+	}
 
 	private static final Instant NOW = Instant.parse("2026-09-13T12:00:00Z");
 
@@ -233,6 +391,75 @@ class JsonParrotRepositoryTest {
 		assertAll(
 				() -> assertEquals(1, result.records().size(), "подтверждённая операция обязана уцелеть"),
 				() -> assertTrue(result.warnings().stream().anyMatch(w -> w.contains("хвост"))));
+	}
+
+	@Test
+	void discardedTailDoesNotCorruptSubsequentAppend(@TempDir Path dir) throws IOException {
+		JsonParrotRepository repository = new JsonParrotRepository(dir);
+		repository.load();
+		ViewerParrotRecord first = record("first", UUID.randomUUID());
+		repository.appendJournal(commit(1, UUID.randomUUID(), first));
+		repository.close();
+		Files.writeString(dir.resolve(JsonParrotRepository.JOURNAL_FILE), "{\"sequence\":2",
+				StandardCharsets.UTF_8, java.nio.file.StandardOpenOption.APPEND);
+		JsonParrotRepository recovered = new JsonParrotRepository(dir);
+		assertTrue(recovered.load().warnings().stream().anyMatch(w -> w.contains("хвост")));
+		ViewerParrotRecord second = record("second", UUID.randomUUID());
+		recovered.appendJournal(commit(recovered.nextJournalSequence(), UUID.randomUUID(), second));
+		recovered.close();
+		assertEquals(2, reload(dir).records().size());
+	}
+
+	@Test
+	void incompleteUtf8AtJournalTailIsDiscarded(@TempDir Path dir) throws IOException {
+		JsonParrotRepository repository = new JsonParrotRepository(dir);
+		repository.load();
+		repository.appendJournal(commit(1, UUID.randomUUID(), record("first", UUID.randomUUID())));
+		repository.close();
+		byte[] tail = "{\"displayName\":\"Д".getBytes(StandardCharsets.UTF_8);
+		Files.write(dir.resolve(JsonParrotRepository.JOURNAL_FILE), java.util.Arrays.copyOf(tail, tail.length - 1),
+				java.nio.file.StandardOpenOption.APPEND);
+		JsonParrotRepository recovered = new JsonParrotRepository(dir);
+		ParrotRepository.LoadResult result = recovered.load();
+		assertEquals(1, result.records().size());
+		assertTrue(result.warnings().stream().anyMatch(w -> w.contains("хвост")));
+		recovered.appendJournal(commit(recovered.nextJournalSequence(), UUID.randomUUID(), record("second", UUID.randomUUID())));
+		recovered.close();
+		assertEquals(2, reload(dir).records().size());
+	}
+
+	@Test
+	void malformedUtf8InCommittedBytesIsNeverDiscarded(@TempDir Path dir) throws IOException {
+		Path journal = dir.resolve(JsonParrotRepository.JOURNAL_FILE);
+		Files.write(journal, new byte[] {(byte) 0xff, '\n', '{'});
+		assertThrows(IOException.class, () -> new JsonParrotRepository(dir).load());
+	}
+
+	@Test
+	void completeFinalRecordWithoutNewlineCanBeAppended(@TempDir Path dir) throws IOException {
+		ViewerParrotRecord first = record("first", UUID.randomUUID());
+		Files.writeString(dir.resolve(JsonParrotRepository.JOURNAL_FILE),
+				JournalCodec.write(commit(1, UUID.randomUUID(), first)), StandardCharsets.UTF_8);
+		JsonParrotRepository repository = new JsonParrotRepository(dir);
+		repository.load();
+		repository.appendJournal(commit(repository.nextJournalSequence(), UUID.randomUUID(),
+				record("second", UUID.randomUUID())));
+		repository.close();
+		assertEquals(2, reload(dir).records().size());
+	}
+
+	@Test
+	void newerSnapshotDoesNotFallBackToOlderBackup(@TempDir Path dir) throws IOException {
+		JsonParrotRepository repository = new JsonParrotRepository(dir);
+		repository.load();
+		repository.checkpoint(List.of(), List.of(), null);
+		repository.checkpoint(List.of(), List.of(), null);
+		repository.close();
+		Path snapshot = dir.resolve(JsonParrotRepository.SNAPSHOT_FILE);
+		String newer = Files.readString(snapshot).replace("\"schemaVersion\": 1", "\"schemaVersion\": 2");
+		Files.writeString(snapshot, newer, StandardCharsets.UTF_8);
+		assertThrows(StorageFaultException.class, () -> new JsonParrotRepository(dir).load());
+		assertEquals(newer, Files.readString(snapshot));
 	}
 
 	@Test

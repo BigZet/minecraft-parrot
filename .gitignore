@@ -3,6 +3,7 @@
 build/
 out/
 classes/
+artifacts/
 
 # Loom
 .fabric/
@@ -19,3 +20,18 @@ run/
 .classpath
 .project
 bin/
+
+# Local Twitch settings and OAuth secrets
+**/config/viewerparrots-twitch.json
+viewerparrots-twitch-token.txt
+
+# Local OpenRouter secret (never bundled with the mod)
+viewerparrots-openrouter-token.txt
+__pycache__/
+
+# Local assistant state, logs and credentials
+.serena/
+logs/
+.env
+.env.*
+*.dpapi

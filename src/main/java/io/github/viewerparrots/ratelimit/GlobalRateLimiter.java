@@ -58,6 +58,16 @@ public final class GlobalRateLimiter {
 	 * действия сюда не попадают: у них свои ограничители.
 	 */
 	public Decision tryAcquire(ParrotAction action) {
+		Decision available = check(action);
+		if (!available.allowed() || !action.countsTowardActionBudget()) return available;
+		long tick = this.clock.currentTick();
+		this.actions.tryConsume(tick);
+		if (action.countsTowardSoundBudget()) this.sounds.tryConsume(tick);
+		return Decision.allow();
+	}
+
+	/** Availability check used before cooldown validation; it never spends tokens. */
+	public Decision check(ParrotAction action) {
 		Objects.requireNonNull(action, "action");
 		if (!action.countsTowardActionBudget()) {
 			return Decision.allow();
@@ -72,15 +82,19 @@ public final class GlobalRateLimiter {
 			if (actionsRetry > 0 || soundsRetry > 0) {
 				return Decision.deny(Math.max(actionsRetry, soundsRetry));
 			}
-			this.actions.tryConsume(tick);
-			this.sounds.tryConsume(tick);
 			return Decision.allow();
 		}
 
-		if (this.actions.tryConsume(tick)) {
+		if (this.actions.retryAfterTicks(tick) == 0) {
 			return Decision.allow();
 		}
 		return Decision.deny(this.actions.retryAfterTicks(tick));
+	}
+
+	public void reconfigure(int actionsPer20Ticks, int soundsPer20Ticks) {
+		long tick = this.clock.currentTick();
+		this.actions.reconfigure(actionsPer20Ticks, actionsPer20Ticks, WINDOW_TICKS, tick);
+		this.sounds.reconfigure(soundsPer20Ticks, soundsPer20Ticks, WINDOW_TICKS, tick);
 	}
 
 	/**

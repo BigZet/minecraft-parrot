@@ -15,6 +15,26 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** Глобальные бюджеты раздела 7 ТЗ: 20 действий и 4 звука за 20 тиков, диагностика отдельно. */
 class GlobalRateLimiterTest {
 
+	@Test
+	void checkingAvailabilityDoesNotDrainBudgetBeforeCooldownValidation() {
+		var clock = new TestGameClock();
+		var limiter = new GlobalRateLimiter(clock, 1, 1);
+		for (int i = 0; i < 10; i++) assertTrue(limiter.check(ParrotAction.SCREAM).allowed());
+		assertTrue(limiter.tryAcquire(ParrotAction.SCREAM).allowed());
+		assertFalse(limiter.check(ParrotAction.SIT).allowed());
+	}
+
+	@Test
+	void reloadKeepsConsumedBudgetsAndAppliesNewRefillRate() {
+		var clock = new TestGameClock();
+		var limiter = new GlobalRateLimiter(clock, 1, 1);
+		assertTrue(limiter.tryAcquire(ParrotAction.SCREAM).allowed());
+		limiter.reconfigure(2, 2);
+		assertFalse(limiter.check(ParrotAction.SCREAM).allowed());
+		clock.advanceTicks(10);
+		assertTrue(limiter.tryAcquire(ParrotAction.SCREAM).allowed());
+	}
+
 	private TestGameClock clock;
 	private GlobalRateLimiter limiter;
 

@@ -1,6 +1,7 @@
 package io.github.viewerparrots.service;
 
 import io.github.viewerparrots.api.CommandResult;
+import io.github.viewerparrots.api.CommandStatus;
 import io.github.viewerparrots.diagnostics.ErrorCode;
 import io.github.viewerparrots.time.TestGameClock;
 import org.junit.jupiter.api.BeforeEach;
@@ -82,5 +83,40 @@ class CommandResultCacheTest {
 		this.cache.remember(rejected);
 
 		assertEquals(rejected, this.cache.find(commandId).orElseThrow());
+	}
+
+	@Test
+	void completionWaitsForFinalResultAndDuplicatesSeeThatResult() {
+		UUID id = UUID.randomUUID();
+		cache.remember(new CommandResult(id, CommandStatus.ACCEPTED, null,
+				"viewerparrots.action.accepted", Map.of(), 0));
+		var completion = cache.completion(id);
+		org.junit.jupiter.api.Assertions.assertFalse(completion.isDone());
+		CommandResult finalResult = result(id);
+		cache.remember(finalResult);
+		assertEquals(finalResult, completion.join());
+		assertEquals(finalResult, cache.find(id).orElseThrow());
+	}
+
+	@Test
+	void clearingCacheReleasesPendingCompletionAndBoundsReferences() {
+		UUID id = UUID.randomUUID();
+		cache.remember(new CommandResult(id, CommandStatus.ACCEPTED, null,
+				"viewerparrots.action.accepted", Map.of(), 0));
+		var completion = cache.completion(id);
+		cache.clear();
+		assertEquals(CommandStatus.CANCELLED, completion.join().status());
+		assertEquals(0, cache.size());
+	}
+
+	@Test
+	void evictingPendingResultReleasesItsCompletionFuture() {
+		UUID id = UUID.randomUUID();
+		cache.remember(new CommandResult(id, CommandStatus.ACCEPTED, null,
+				"viewerparrots.action.accepted", Map.of(), 0));
+		var completion = cache.completion(id);
+		for (int i = 0; i < CommandResultCache.MAX_ENTRIES; i++) cache.remember(result(UUID.randomUUID()));
+		assertEquals(CommandStatus.CANCELLED, completion.join().status());
+		assertEquals(CommandResultCache.MAX_ENTRIES, cache.size());
 	}
 }

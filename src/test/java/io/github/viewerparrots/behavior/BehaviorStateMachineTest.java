@@ -23,6 +23,36 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** Табличные переходы поведения из раздела 5.2 ТЗ (требование раздела 15.1). */
 class BehaviorStateMachineTest {
 
+	@ParameterizedTest
+	@CsvSource({"COMMAND_HAT", "COMMAND_DEHAT"})
+	void changingHatPreservesMovementDanceAndSavedIntent(String eventName) {
+		Event event = Event.valueOf(eventName);
+		for (BehaviorState behavior : BehaviorState.values()) {
+			for (DesiredBehavior desired : DesiredBehavior.values()) {
+				Accepted result = accepted(behavior, desired, event);
+				assertEquals(behavior, result.behavior());
+				assertEquals(desired, result.desiredBehavior());
+				assertTrue(result.cancellations().isEmpty());
+			}
+		}
+	}
+
+	@Test
+	void spinPreservesStableBehaviorAndRejectsOverlappingTransientActions() {
+		Event spin = Event.valueOf("COMMAND_SPIN");
+		for (DesiredBehavior desired : DesiredBehavior.values()) {
+			Accepted result = accepted(desired.toBehaviorState(), desired, spin);
+			assertEquals(desired.toBehaviorState(), result.behavior());
+			assertEquals(desired, result.desiredBehavior());
+			assertTrue(result.cancellations().isEmpty());
+		}
+		for (BehaviorState current : new BehaviorState[]{BehaviorState.RETURNING, BehaviorState.DANCING}) {
+			Rejected rejected = assertInstanceOf(Rejected.class,
+					BehaviorStateMachine.apply(current, DesiredBehavior.FOLLOWING, spin));
+			assertEquals(ErrorCode.INVALID_STATE, rejected.code());
+		}
+	}
+
 	private static Accepted accepted(BehaviorState from, DesiredBehavior desired, Event event) {
 		Result result = BehaviorStateMachine.apply(from, desired, event);
 		return assertInstanceOf(Accepted.class, result, "ожидался принятый переход");
@@ -128,6 +158,19 @@ class BehaviorStateMachineTest {
 				() -> assertTrue(result.cancellations().isEmpty()));
 	}
 
+	@ParameterizedTest
+	@EnumSource(BehaviorState.class)
+	@DisplayName("love и exp сохраняют поведение и не отменяют движение или танец")
+	void effectsDoNotInterruptBehavior(BehaviorState current) {
+		for (Event event : new Event[]{Event.COMMAND_LOVE, Event.COMMAND_EXP}) {
+			Accepted result = accepted(current, DesiredBehavior.FOLLOWING, event);
+			assertAll(
+					() -> assertEquals(current, result.behavior()),
+					() -> assertEquals(DesiredBehavior.FOLLOWING, result.desiredBehavior()),
+					() -> assertTrue(result.cancellations().isEmpty()));
+		}
+	}
+
 	@Test
 	@DisplayName("выход стримера останавливает следование, но намерение FOLLOWING сохраняется")
 	void targetLossStopsFollowingButKeepsIntent() {
@@ -144,6 +187,13 @@ class BehaviorStateMachineTest {
 	void targetLossLetsDanceFinish() {
 		Accepted result = accepted(BehaviorState.DANCING, DesiredBehavior.IDLE, Event.TARGET_LOST);
 		assertEquals(BehaviorState.DANCING, result.behavior());
+	}
+
+	@Test
+	void targetReturnResumesOnlyPausedFollowing() {
+		assertEquals(BehaviorState.FOLLOWING, accepted(BehaviorState.IDLE, DesiredBehavior.FOLLOWING, Event.TARGET_AVAILABLE).behavior());
+		assertEquals(BehaviorState.SITTING, accepted(BehaviorState.SITTING, DesiredBehavior.SITTING, Event.TARGET_AVAILABLE).behavior());
+		assertEquals(BehaviorState.DANCING, accepted(BehaviorState.DANCING, DesiredBehavior.FOLLOWING, Event.TARGET_AVAILABLE).behavior());
 	}
 
 	@Test
@@ -170,13 +220,13 @@ class BehaviorStateMachineTest {
 	}
 
 	@Test
-	@DisplayName("создание и respawn дают IDLE с намерением IDLE")
-	void creationResetsToIdle() {
+	@DisplayName("создание и respawn дают FREE с намерением FREE")
+	void creationResetsToFree() {
 		Accepted result = accepted(BehaviorState.FOLLOWING, DesiredBehavior.FOLLOWING, Event.CREATED_OR_RESPAWNED);
 
 		assertAll(
-				() -> assertEquals(BehaviorState.IDLE, result.behavior()),
-				() -> assertEquals(DesiredBehavior.IDLE, result.desiredBehavior()));
+				() -> assertEquals(BehaviorState.FREE, result.behavior()),
+				() -> assertEquals(DesiredBehavior.FREE, result.desiredBehavior()));
 	}
 
 	@Test

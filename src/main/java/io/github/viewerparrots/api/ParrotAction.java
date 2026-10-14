@@ -15,9 +15,21 @@ public enum ParrotAction {
 	LIST(Access.CONTROL, Category.DIAGNOSTIC),
 	COME(Access.CONTROL, Category.GAME),
 	FOLLOW(Access.CONTROL, Category.GAME),
+	FREE(Access.CONTROL, Category.GAME),
+	FREEFOLLOW(Access.CONTROL, Category.GAME),
+	VIEW(Access.CONTROL, Category.GAME),
+	DEVIEW(Access.CONTROL, Category.GAME),
+	ARM(Access.CONTROL, Category.GAME),
+	DEARM(Access.CONTROL, Category.GAME),
 	SIT(Access.CONTROL, Category.GAME),
 	DANCE(Access.CONTROL, Category.GAME),
+	SPIN(Access.CONTROL, Category.GAME),
 	SCREAM(Access.CONTROL, Category.SOUND),
+	SAY(Access.CONTROL, Category.SOUND),
+	LOVE(Access.CONTROL, Category.GAME),
+	HAT(Access.CONTROL, Category.GAME),
+	DEHAT(Access.CONTROL, Category.GAME),
+	EXP(Access.CONTROL, Category.GAME),
 
 	// --- admin level (раздел 12) ---
 	CREATE(Access.ADMIN, Category.MUTATION),
@@ -30,6 +42,13 @@ public enum ParrotAction {
 	SAVE(Access.ADMIN, Category.MUTATION),
 	RELOAD(Access.ADMIN, Category.MUTATION),
 	STATUS(Access.ADMIN, Category.DIAGNOSTIC);
+
+	public static final int EXP_COOLDOWN_TICKS = 30 * 20;
+	public static final int SAY_COOLDOWN_TICKS = 2 * 20;
+	public static final int SPIN_DURATION_TICKS = 3 * 20;
+	public static final int SPIN_COOLDOWN_TICKS = 5 * 20;
+	public static final int HAT_COOLDOWN_TICKS = 2 * 20;
+	public static final int SIMPLE_CONTROL_COOLDOWN_TICKS = 2 * 20;
 
 	public enum Access {
 		CONTROL,
@@ -79,7 +98,7 @@ public enum ParrotAction {
 	/** Действия, у которых есть собственный cooldown по viewerId + action (раздел 7 ТЗ). */
 	public boolean hasCooldown() {
 		return switch (this) {
-			case COME, FOLLOW, SIT, DANCE, SCREAM, RESPAWN -> true;
+			case COME, FOLLOW, FREE, FREEFOLLOW, VIEW, DEVIEW, ARM, DEARM, SIT, DANCE, SPIN, SCREAM, SAY, LOVE, HAT, DEHAT, EXP, RESPAWN -> true;
 			default -> false;
 		};
 	}

@@ -1,0 +1,7 @@
+{
+  "required": true,
+  "package": "io.github.viewerparrots.gametest.crash",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": ["RepositoryCrashGateMixin"],
+  "injectors": {"defaultRequire": 1}
+}

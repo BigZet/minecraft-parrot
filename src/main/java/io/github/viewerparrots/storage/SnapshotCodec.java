@@ -24,11 +24,10 @@ public final class SnapshotCodec {
 
 	public static SnapshotDto read(String json) {
 		JsonView root = JsonView.ofRoot(StrictJson.parseObject(json));
-		root.requireKnownFields("schemaVersion", "checkpointSequence", "streamerPlayerUuid",
-				"parrots", "tombstones");
-
 		int schemaVersion = root.requireInt("schemaVersion");
 		StorageMigrator.requireReadable(schemaVersion, "$.schemaVersion");
+		root.requireKnownFields("schemaVersion", "checkpointSequence", "streamerPlayerUuid",
+				"parrots", "tombstones");
 
 		long checkpointSequence = root.requireLong("checkpointSequence");
 		if (checkpointSequence < 0) {

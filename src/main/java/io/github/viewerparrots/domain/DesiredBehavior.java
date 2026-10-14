@@ -6,12 +6,16 @@ package io.github.viewerparrots.domain;
  */
 public enum DesiredBehavior {
 	IDLE,
+	FREE,
+	FREEFOLLOW,
 	SITTING,
 	FOLLOWING;
 
 	public BehaviorState toBehaviorState() {
 		return switch (this) {
 			case IDLE -> BehaviorState.IDLE;
+			case FREE -> BehaviorState.FREE;
+			case FREEFOLLOW -> BehaviorState.FREEFOLLOW;
 			case SITTING -> BehaviorState.SITTING;
 			case FOLLOWING -> BehaviorState.FOLLOWING;
 		};
@@ -23,9 +27,11 @@ public enum DesiredBehavior {
 	public static DesiredBehavior fromStable(BehaviorState state) {
 		return switch (state) {
 			case IDLE -> IDLE;
+			case FREE -> FREE;
+			case FREEFOLLOW -> FREEFOLLOW;
 			case SITTING -> SITTING;
 			case FOLLOWING -> FOLLOWING;
-			case RETURNING, DANCING -> throw new IllegalArgumentException(
+			case RETURNING, DANCING, SHOULDER -> throw new IllegalArgumentException(
 					"Временное состояние " + state + " не является намерением");
 		};
 	}

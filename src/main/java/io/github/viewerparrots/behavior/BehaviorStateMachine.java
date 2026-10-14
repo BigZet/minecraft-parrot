@@ -24,9 +24,20 @@ public final class BehaviorStateMachine {
 		CREATED_OR_RESPAWNED,
 		COMMAND_SIT,
 		COMMAND_FOLLOW,
+		COMMAND_FREE,
+		COMMAND_FREEFOLLOW,
+		COMMAND_VIEW,
+		COMMAND_DEVIEW,
+		COMMAND_ARM,
+		COMMAND_DEARM,
 		COMMAND_COME,
 		COMMAND_DANCE,
+		COMMAND_SPIN,
+		COMMAND_HAT,
+		COMMAND_DEHAT,
 		COMMAND_SCREAM,
+		COMMAND_LOVE,
+		COMMAND_EXP,
 		/** Достигнут радиус прибытия. */
 		ARRIVAL_REACHED,
 		/** Движение не завершилось за отведённое время. */
@@ -36,7 +47,9 @@ public final class BehaviorStateMachine {
 		/** Выгрузка, смерть или удаление — временные действия отменяются. */
 		DEACTIVATED,
 		/** Целевой стример вышел или погиб. */
-		TARGET_LOST
+		TARGET_LOST,
+		/** A paused FOLLOWING intent resumes when the configured live target returns. */
+		TARGET_AVAILABLE
 	}
 
 	/** Что нужно отменить при переходе. */
@@ -77,7 +90,7 @@ public final class BehaviorStateMachine {
 		Objects.requireNonNull(event, "event");
 
 		return switch (event) {
-			case CREATED_OR_RESPAWNED -> accepted(BehaviorState.IDLE, DesiredBehavior.IDLE,
+			case CREATED_OR_RESPAWNED -> accepted(BehaviorState.FREE, DesiredBehavior.FREE,
 					Cancellation.MOVEMENT, Cancellation.DANCE, Cancellation.PENDING_LAZY_ACTION);
 
 			// sit выполняется немедленно из любого состояния и не задерживается trait LAZY.
@@ -86,6 +99,15 @@ public final class BehaviorStateMachine {
 
 			case COMMAND_FOLLOW -> accepted(BehaviorState.FOLLOWING, DesiredBehavior.FOLLOWING,
 					Cancellation.MOVEMENT, Cancellation.DANCE);
+
+			case COMMAND_FREE -> accepted(BehaviorState.FREE, DesiredBehavior.FREE,
+					Cancellation.MOVEMENT, Cancellation.DANCE, Cancellation.PENDING_LAZY_ACTION);
+
+			case COMMAND_FREEFOLLOW, COMMAND_DEARM -> accepted(BehaviorState.FREEFOLLOW, DesiredBehavior.FREEFOLLOW,
+					Cancellation.MOVEMENT, Cancellation.DANCE, Cancellation.PENDING_LAZY_ACTION);
+
+			case COMMAND_ARM -> accepted(BehaviorState.SHOULDER, DesiredBehavior.FREEFOLLOW,
+					Cancellation.MOVEMENT, Cancellation.DANCE, Cancellation.PENDING_LAZY_ACTION);
 
 			// come — временное движение: прежнее стабильное намерение сохраняется.
 			case COMMAND_COME -> accepted(BehaviorState.RETURNING, desired,
@@ -96,8 +118,14 @@ public final class BehaviorStateMachine {
 					? new Rejected(ErrorCode.INVALID_STATE)
 					: accepted(BehaviorState.DANCING, desired);
 
-			// Звук состояние не меняет.
-			case COMMAND_SCREAM -> accepted(current, desired);
+			// A short visual spin pauses movement without replacing the saved behavior.
+			case COMMAND_SPIN -> current.isTransient()
+					? new Rejected(ErrorCode.INVALID_STATE)
+					: accepted(current, desired);
+
+			// Звук, сердечки и пузырёк опыта состояние не меняют.
+			case COMMAND_SCREAM, COMMAND_LOVE, COMMAND_EXP, COMMAND_HAT, COMMAND_DEHAT,
+					COMMAND_VIEW, COMMAND_DEVIEW -> accepted(current, desired);
 
 			case ARRIVAL_REACHED, MOVEMENT_TIMEOUT -> current == BehaviorState.RETURNING
 					? accepted(desired.toBehaviorState(), desired, Cancellation.MOVEMENT)
@@ -114,10 +142,22 @@ public final class BehaviorStateMachine {
 			// чтобы движение возобновилось после появления живого target (раздел 5.3 ТЗ).
 			case TARGET_LOST -> switch (current) {
 				case FOLLOWING -> accepted(BehaviorState.IDLE, desired, Cancellation.MOVEMENT);
+				case FREEFOLLOW -> accepted(BehaviorState.FREE, desired, Cancellation.MOVEMENT);
+				case SHOULDER -> accepted(BehaviorState.FREEFOLLOW, DesiredBehavior.FREEFOLLOW,
+						Cancellation.MOVEMENT, Cancellation.DANCE, Cancellation.PENDING_LAZY_ACTION);
 				case RETURNING -> accepted(desired.toBehaviorState(), desired, Cancellation.MOVEMENT);
 				// Танец может завершиться на месте.
-				case DANCING, IDLE, SITTING -> accepted(current, desired);
+				case DANCING, IDLE, FREE, SITTING -> accepted(current, desired);
 			};
+			case TARGET_AVAILABLE -> {
+				if (current == BehaviorState.IDLE && desired == DesiredBehavior.FOLLOWING) {
+					yield accepted(BehaviorState.FOLLOWING, desired, Cancellation.MOVEMENT);
+				}
+				if (current == BehaviorState.FREE && desired == DesiredBehavior.FREEFOLLOW) {
+					yield accepted(BehaviorState.FREEFOLLOW, desired, Cancellation.MOVEMENT);
+				}
+				yield accepted(current, desired);
+			}
 		};
 	}
 

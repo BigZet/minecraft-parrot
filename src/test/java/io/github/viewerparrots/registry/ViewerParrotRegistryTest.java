@@ -28,6 +28,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * конкурирующие create не превышают лимит. Плюс инварианты индексов из раздела 4.4.
  */
 class ViewerParrotRegistryTest {
+	@Test
+	void snapshotCompletionDoesNotClearSubsequentMutation() {
+		ViewerParrotRegistry registry = new ViewerParrotRegistry();
+		registry.put(record("first"));
+		long capturedEpoch = registry.changeEpoch();
+		registry.setStreamerPlayerUuid(UUID.randomUUID());
+		registry.markClean(capturedEpoch);
+		assertTrue(registry.isDirty());
+		registry.markClean(registry.changeEpoch());
+		assertFalse(registry.isDirty());
+	}
 
 	private static final Instant NOW = Instant.parse("2026-09-13T00:00:00Z");
 	private static final int MAX_ACTIVE = 50;

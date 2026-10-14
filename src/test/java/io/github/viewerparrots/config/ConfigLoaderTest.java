@@ -22,6 +22,48 @@ class ConfigLoaderTest {
 	private final ConfigLoader loader = new ConfigLoader(ConfigValidator.withoutRegistry());
 
 	@Test
+	void queueCapacityAcceptsOneAndTheSpecifiedHardMaximum() {
+		for (int capacity : new int[]{1, 256}) {
+			ViewerParrotsConfig defaults = ViewerParrotsConfig.defaults();
+			ViewerParrotsConfig candidate = withLimits(defaults,
+					new ViewerParrotsConfig.Limits(20, 4, capacity));
+			assertEquals(candidate, this.loader.parse(ConfigLoader.toJson(candidate)));
+		}
+	}
+
+	@Test
+	void queueCapacityAboveTheHardMaximumIsRejectedWithItsJsonPath() {
+		assertAll(java.util.stream.IntStream.of(257, 1024).<org.junit.jupiter.api.function.Executable>mapToObj(capacity -> () -> {
+			ViewerParrotsConfig defaults = ViewerParrotsConfig.defaults();
+			ViewerParrotsConfig candidate = withLimits(defaults,
+					new ViewerParrotsConfig.Limits(20, 4, capacity));
+			ConfigInvalidException error = assertThrows(ConfigInvalidException.class,
+					() -> this.loader.parse(ConfigLoader.toJson(candidate)), "queueCapacity " + capacity);
+			assertTrue(error.getMessage().contains("$.limits.queueCapacity"));
+		}));
+	}
+
+	@Test
+	void newlyCreatedDefaultsMustAlsoPassRegistryValidation(@TempDir Path dir) {
+		ConfigLoader strict = new ConfigLoader(new ConfigValidator(id -> false));
+		Path file = dir.resolve("viewerparrots.json");
+		assertThrows(ConfigInvalidException.class, () -> strict.loadOrCreate(file));
+		org.junit.jupiter.api.Assertions.assertFalse(Files.exists(file));
+	}
+
+	@Test
+	void dangerSearchRadiusIsBoundedLikeOtherDistances() {
+		ViewerParrotsConfig current = ViewerParrotsConfig.defaults();
+		var b = current.behavior();
+		ViewerParrotsConfig candidate = withBehavior(current, new ViewerParrotsConfig.Behavior(
+				b.enabled(), b.idleMinTicks(), b.idleMaxTicks(), b.dangerCheckTicks(), 129,
+				b.lazyMinTicks(), b.lazyMaxTicks(), b.normalSoundChance(), b.loudSoundChance(), b.traitWeights()));
+		ConfigInvalidException error = assertThrows(ConfigInvalidException.class,
+				() -> ConfigValidator.withoutRegistry().validate(candidate));
+		assertTrue(error.getMessage().contains("$.behavior.dangerRadius"));
+	}
+
+	@Test
 	@DisplayName("значения по умолчанию проходят собственную валидацию")
 	void defaultsAreValid() {
 		ConfigValidator.withoutRegistry().validate(ViewerParrotsConfig.defaults());
@@ -211,7 +253,7 @@ class ConfigLoaderTest {
 		ViewerParrotsConfig current = ViewerParrotsConfig.defaults();
 
 		ViewerParrotsConfig queueChanged = withLimits(current,
-				new ViewerParrotsConfig.Limits(20, 4, 512));
+				new ViewerParrotsConfig.Limits(20, 4, 128));
 		ViewerParrotsConfig recoveryChanged = new ViewerParrotsConfig(
 				current.schemaVersion(), current.maxActiveParrots(), current.deathMode(),
 				current.nameFormat(), current.nameVisible(), current.permissions(), current.come(),

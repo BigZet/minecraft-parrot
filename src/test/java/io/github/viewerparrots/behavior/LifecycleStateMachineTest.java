@@ -106,7 +106,10 @@ class LifecycleStateMachineTest {
 	@DisplayName("игровые команды доступны только в LOADED")
 	void gameplayActionsRequireLoaded() {
 		for (ParrotAction action : new ParrotAction[]{
-				ParrotAction.FOLLOW, ParrotAction.SIT, ParrotAction.DANCE, ParrotAction.SCREAM}) {
+				ParrotAction.FOLLOW, ParrotAction.SIT, ParrotAction.DANCE, ParrotAction.HAT, ParrotAction.DEHAT,
+				ParrotAction.FREE, ParrotAction.FREEFOLLOW, ParrotAction.VIEW, ParrotAction.DEVIEW,
+				ParrotAction.ARM, ParrotAction.DEARM,
+				ParrotAction.SCREAM, ParrotAction.LOVE, ParrotAction.EXP}) {
 			assertTrue(LifecycleStateMachine.allows(LifecycleState.LOADED, action), action + " в LOADED");
 			for (LifecycleState state : LifecycleState.values()) {
 				if (state == LifecycleState.LOADED) {

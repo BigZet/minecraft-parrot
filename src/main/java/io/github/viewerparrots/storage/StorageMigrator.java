@@ -27,7 +27,7 @@ public final class StorageMigrator {
 			return;
 		}
 		if (schemaVersion > SnapshotDto.CURRENT_SCHEMA_VERSION) {
-			throw new JsonSchemaException(path, "файл записан более новой версией схемы ("
+			throw new UnsupportedSchemaException(path + ": файл записан более новой версией схемы ("
 					+ schemaVersion + " > " + SnapshotDto.CURRENT_SCHEMA_VERSION
 					+ "); обновите мод, запись запрещена");
 		}
@@ -36,6 +36,13 @@ public final class StorageMigrator {
 		}
 		throw new StorageFaultException("нет миграции со схемы " + schemaVersion
 				+ " на " + SnapshotDto.CURRENT_SCHEMA_VERSION);
+	}
+
+	/** A newer format must never be treated as ordinary corruption and downgraded via backup. */
+	public static final class UnsupportedSchemaException extends StorageFaultException {
+		public UnsupportedSchemaException(String message) {
+			super(message);
+		}
 	}
 
 	/** @return разрешена ли запись файлов этой версии */

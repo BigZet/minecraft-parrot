@@ -1,0 +1,25 @@
+name: Build hobby mod
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Assemble mod JAR
+        run: chmod +x gradlew && ./gradlew assemble --console=plain
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: viewerparrots-jar
+          path: |
+            build/libs/*.jar

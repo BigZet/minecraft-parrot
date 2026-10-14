@@ -1,10 +1,12 @@
 package io.github.viewerparrots.api.event;
 
-import io.github.viewerparrots.ViewerParrotsMod;
+import io.github.viewerparrots.diagnostics.AuditLog;
+import io.github.viewerparrots.diagnostics.ErrorCode;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Map;
 import java.util.function.Consumer;
 
 /**
@@ -28,13 +30,18 @@ public final class EventDispatcher {
 
 	public void publish(ParrotEvent event) {
 		Objects.requireNonNull(event, "event");
-		for (Consumer<ParrotEvent> listener : this.listeners) {
+		for (Consumer<ParrotEvent> listener : List.copyOf(this.listeners)) {
+			long started = AuditLog.started();
 			try {
 				listener.accept(event);
 			} catch (RuntimeException e) {
-				ViewerParrotsMod.LOGGER.error(
-						"Слушатель события {} для {} завершился ошибкой; остальные продолжат работу",
-						event.type(), event.viewerId(), e);
+				String action = event.type() == ParrotEvent.Type.COMMAND_ACCEPTED || event.type() == ParrotEvent.Type.COMMAND_REJECTED
+						? event.newState() : null;
+				AuditLog.error("listener_failed", new AuditLog.Context(event.commandId(),
+						event.viewerId() == null ? null : event.viewerId().value(), event.incarnationId(),
+						event.incarnationId() == null ? null : event.generation(), null, action),
+						"FAILED", ErrorCode.INTERNAL_ERROR.name(), started,
+						Map.of("eventId", event.eventId(), "eventType", event.type().name()), e);
 			}
 		}
 	}

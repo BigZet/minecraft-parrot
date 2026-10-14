@@ -1,0 +1,37 @@
+{
+  "parrot_speech": {
+    "sounds": [
+      { "name": "fabric-sound-api-v1:empty", "stream": true }
+    ]
+  },
+  "parrot.call_01": {
+    "subtitle": "viewerparrots.sound.parrot_call",
+    "sounds": [
+      { "name": "viewerparrots:parrot/call_01", "stream": false }
+    ]
+  },
+  "parrot.call_12": {
+    "subtitle": "viewerparrots.sound.parrot_call",
+    "sounds": [
+      { "name": "viewerparrots:parrot/call_12", "stream": false }
+    ]
+  },
+  "parrot.call_14": {
+    "subtitle": "viewerparrots.sound.parrot_call",
+    "sounds": [
+      { "name": "viewerparrots:parrot/call_14", "stream": false }
+    ]
+  },
+  "parrot.call_15": {
+    "subtitle": "viewerparrots.sound.parrot_call",
+    "sounds": [
+      { "name": "viewerparrots:parrot/call_15", "stream": false }
+    ]
+  },
+  "parrot.call_27": {
+    "subtitle": "viewerparrots.sound.parrot_call",
+    "sounds": [
+      { "name": "viewerparrots:parrot/call_27", "stream": false }
+    ]
+  }
+}

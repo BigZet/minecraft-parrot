@@ -39,6 +39,7 @@ public final class ConfigLoader {
 		Objects.requireNonNull(file, "file");
 		if (!Files.exists(file)) {
 			ViewerParrotsConfig defaults = ViewerParrotsConfig.defaults();
+			this.validator.validate(defaults);
 			Path parent = file.getParent();
 			if (parent != null) {
 				Files.createDirectories(parent);

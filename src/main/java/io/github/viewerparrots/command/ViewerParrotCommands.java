@@ -6,16 +6,21 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import io.github.viewerparrots.api.ActorContext;
+import io.github.viewerparrots.api.ActionParameters;
+import io.github.viewerparrots.api.CommandRequest;
 import io.github.viewerparrots.api.CommandResult;
+import io.github.viewerparrots.api.CommandStatus;
 import io.github.viewerparrots.api.ParrotAction;
-import io.github.viewerparrots.bootstrap.CheckpointScheduler;
 import io.github.viewerparrots.bootstrap.ServerContext;
+import io.github.viewerparrots.diagnostics.AuditLog;
 import io.github.viewerparrots.diagnostics.ErrorCode;
 import io.github.viewerparrots.domain.DisplayName;
 import io.github.viewerparrots.domain.LifecycleState;
 import io.github.viewerparrots.domain.ParrotTrait;
+import io.github.viewerparrots.domain.PhysicalStatus;
 import io.github.viewerparrots.domain.ViewerId;
 import io.github.viewerparrots.domain.ViewerParrotRecord;
+import io.github.viewerparrots.twitch.TwitchChatBridge;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.command.CommandSource;
 import net.minecraft.command.argument.EntityArgumentType;
@@ -28,6 +33,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 
 /**
  * Команды {@code /viewerparrot} и алиас {@code /vp} (раздел 6 ТЗ).
@@ -48,9 +56,9 @@ public final class ViewerParrotCommands {
 	public static void register() {
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
 			LiteralArgumentBuilder<ServerCommandSource> root = build();
-			dispatcher.register(root);
+			var registered = dispatcher.register(root);
 			// Алиас разделяет то же дерево, включая фильтры прав.
-			dispatcher.register(CommandManager.literal("vp").redirect(dispatcher.register(build())));
+			dispatcher.register(CommandManager.literal("vp").redirect(registered));
 		});
 	}
 
@@ -62,6 +70,8 @@ public final class ViewerParrotCommands {
 				.then(CommandManager.literal("help")
 						.requires(source -> allowed(source, ParrotAction.HELP))
 						.executes(ctx -> help(ctx.getSource())))
+
+				.then(TwitchChatBridge.commands().requires(source -> allowed(source, ParrotAction.STATUS)))
 
 				.then(CommandManager.literal("streamer")
 						.requires(source -> allowed(source, ParrotAction.STREAMER))
@@ -127,13 +137,34 @@ public final class ViewerParrotCommands {
 
 				.then(gameAction("come", ParrotAction.COME))
 				.then(gameAction("follow", ParrotAction.FOLLOW))
+				.then(gameAction("free", ParrotAction.FREE))
+				.then(gameAction("freefollow", ParrotAction.FREEFOLLOW))
+				.then(gameAction("view", ParrotAction.VIEW))
+				.then(gameAction("deview", ParrotAction.DEVIEW))
+				.then(gameAction("arm", ParrotAction.ARM))
+				.then(gameAction("dearm", ParrotAction.DEARM))
 				.then(gameAction("sit", ParrotAction.SIT))
 				.then(gameAction("dance", ParrotAction.DANCE))
+				.then(gameAction("spin", ParrotAction.SPIN))
 				.then(gameAction("scream", ParrotAction.SCREAM))
+				.then(CommandManager.literal("say")
+						.requires(source -> allowed(source, ParrotAction.SAY))
+						.then(viewerIdArgument()
+								.then(CommandManager.argument("text", StringArgumentType.greedyString())
+										.executes(ctx -> say(ctx, StringArgumentType.getString(ctx, "viewerId"),
+												StringArgumentType.getString(ctx, "text"))))))
+				.then(gameAction("love", ParrotAction.LOVE))
+				.then(gameAction("hat", ParrotAction.HAT))
+				.then(gameAction("dehat", ParrotAction.DEHAT))
+				.then(gameAction("exp", ParrotAction.EXP))
 
 				.then(CommandManager.literal("save")
 						.requires(source -> allowed(source, ParrotAction.SAVE))
 						.executes(ctx -> save(ctx.getSource())))
+
+				.then(CommandManager.literal("reload")
+						.requires(source -> allowed(source, ParrotAction.RELOAD))
+						.executes(ctx -> reload(ctx.getSource())))
 
 				.then(CommandManager.literal("status")
 						.requires(source -> allowed(source, ParrotAction.STATUS))
@@ -156,14 +187,18 @@ public final class ViewerParrotCommands {
 
 	private static int runGameAction(CommandContext<ServerCommandSource> ctx, ParrotAction action,
 			String rawViewerId) {
+		return withViewerId(ctx, rawViewerId, (context, source, viewerId) ->
+				submit(context, source, viewerId, action, ActionParameters.None.INSTANCE, null));
+	}
+
+	private static int say(CommandContext<ServerCommandSource> ctx, String rawViewerId, String text) {
 		return withViewerId(ctx, rawViewerId, (context, source, viewerId) -> {
-			ActorContext actor = toActor(source, context);
-			CommandResult result = context.commandService()
-					.submit(UUID.randomUUID(), actor, action, viewerId);
-			CommandFeedback.send(source, result);
-			// Brigadier возвращает 1 при приёме и 0 при синхронном отказе; это не
-			// обещание завершённой записи на диск (раздел 6.2 ТЗ).
-			return result.succeeded() ? 1 : 0;
+			try {
+				return submit(context, source, viewerId, ParrotAction.SAY, new ActionParameters.Speech(text), null);
+			} catch (IllegalArgumentException invalidText) {
+				source.sendError(errorText(ErrorCode.INVALID_ARGUMENT, invalidText.getMessage()));
+				return 0;
+			}
 		});
 	}
 
@@ -187,6 +222,7 @@ public final class ViewerParrotCommands {
 			}
 			List<String> ids = context.get().registry().allSorted().stream()
 					.map(record -> record.viewerId().value())
+					.filter(id -> CommandSource.shouldSuggest(builder.getRemainingLowerCase(), id.toLowerCase(Locale.ROOT)))
 					.limit(SUGGESTION_LIMIT)
 					.toList();
 			return CommandSource.suggestMatching(ids, builder);
@@ -201,55 +237,48 @@ public final class ViewerParrotCommands {
 	// --- реализации ----------------------------------------------------------
 
 	private static int help(ServerCommandSource source) {
-		source.sendFeedback(() -> Text.literal("""
-				/viewerparrot setstreamer <player> | streamer
-				/viewerparrot create <viewerId> <имя> | remove <viewerId>
-				/viewerparrot rename <viewerId> <имя> | trait <viewerId> <trait>
-				/viewerparrot respawn <viewerId> | reconcile <viewerId>
+		return withContext(source, context -> submit(context, source, null, ParrotAction.HELP,
+				ActionParameters.None.INSTANCE, result -> showHelp(source, result)));
+	}
+
+	private static void showHelp(ServerCommandSource source, CommandResult result) {
+		String control = """
+				/viewerparrot streamer | info <viewerId> | list [page]
 				/viewerparrot come <viewerId> | follow <viewerId> | sit <viewerId>
-				/viewerparrot dance <viewerId> | scream <viewerId>
-				/viewerparrot info <viewerId> | list [страница]
-				/viewerparrot save | status"""), false);
-		return 1;
+				/viewerparrot free <viewerId> | freefollow <viewerId> (free flight / roam near streamer)
+				/viewerparrot view <viewerId> | deview <viewerId> (watch streamer / stop watching)
+				/viewerparrot arm <viewerId> | dearm <viewerId> (vanilla shoulder / release)
+				/viewerparrot dance <viewerId> | scream <viewerId> | love <viewerId> | exp <viewerId>
+				/viewerparrot spin <viewerId> (spin in place for 3 seconds; 5-second cooldown)
+				/viewerparrot hat <viewerId> | dehat <viewerId> (random different hat / remove; 2-second cooldown)
+				/viewerparrot say <viewerId> <text> (first 30 words; 2-second cooldown)
+				Alias: /vp. Names may contain spaces; quote viewer IDs containing ':'.""";
+		String admin = allowed(source, ParrotAction.CREATE) ? "\n" + """
+				/viewerparrot setstreamer <player>
+				/viewerparrot twitch connect | disconnect | status
+				/viewerparrot create <viewerId> <name> | remove <viewerId>
+				/viewerparrot rename <viewerId> <name> | trait <viewerId> <trait>
+				/viewerparrot respawn <viewerId> | reconcile <viewerId>
+				/viewerparrot save | reload | status
+				HERO/THIEF have no effect in MVP; commands use the assigned streamer.""" : "";
+		richFeedback(source, result, control + admin);
 	}
 
 	private static int showStreamer(ServerCommandSource source) {
-		Optional<ServerContext> maybeContext = ServerContext.current();
-		if (maybeContext.isEmpty()) {
-			source.sendError(Text.literal("Мод не инициализирован"));
-			return 0;
-		}
-		ServerContext context = maybeContext.get();
-
-		Optional<UUID> configured = context.streamerService().configuredUuid();
-		if (configured.isEmpty()) {
-			source.sendError(Text.literal("Стример не назначен"));
-			return 0;
-		}
-
-		String name = context.streamerService().onlineName().orElse("не в сети");
-		boolean alive = context.streamerService().onlineTarget().isPresent();
-		source.sendFeedback(() -> Text.literal("Стример " + configured.get()
-				+ ", имя " + name + ", доступен как цель: " + alive), false);
-		return 1;
+		return withContext(source, context -> submit(context, source, null, ParrotAction.STREAMER,
+				ActionParameters.None.INSTANCE, result -> {
+			Optional<UUID> configured = context.streamerService().configuredUuid();
+			String name = context.streamerService().onlineName().orElse("не в сети");
+			boolean online = configured.flatMap(uuid -> Optional.ofNullable(context.server().getPlayerManager().getPlayer(uuid))).isPresent();
+			boolean alive = context.streamerService().onlineTarget().isPresent();
+			richFeedback(source, result, configured.map(uuid -> "Стример " + uuid + ", имя " + name
+					+ ", online: " + online + ", доступен как живая цель: " + alive).orElse("Стример не назначен"));
+		}));
 	}
 
 	private static int setStreamer(ServerCommandSource source, ServerPlayerEntity player) {
-		Optional<ServerContext> maybeContext = ServerContext.current();
-		if (maybeContext.isEmpty()) {
-			source.sendError(Text.literal("Мод не инициализирован"));
-			return 0;
-		}
-		ServerContext context = maybeContext.get();
-		if (!context.allowsMutations()) {
-			source.sendError(errorText(ErrorCode.STORAGE_UNAVAILABLE));
-			return 0;
-		}
-
-		context.streamerService().assign(player.getUuid());
-		source.sendFeedback(() -> Text.literal("Стример назначен: "
-				+ player.getGameProfile().getName() + " (" + player.getUuid() + ")"), true);
-		return 1;
+		return withContext(source, context -> submit(context, source, null, ParrotAction.SETSTREAMER,
+				new ActionParameters.Target(player.getUuid()), null));
 	}
 
 	private static int create(CommandContext<ServerCommandSource> ctx, String rawViewerId, String rawName) {
@@ -271,19 +300,12 @@ public final class ViewerParrotCommands {
 			return 0;
 		}
 
-		UUID commandId = UUID.randomUUID();
-		context.parrotService().create(commandId, viewerId, displayName)
-				.thenAccept(result -> CommandFeedback.send(source, result));
-		return 1;
+		return submit(context, source, viewerId, ParrotAction.CREATE, new ActionParameters.Name(displayName), null);
 	}
 
 	private static int remove(CommandContext<ServerCommandSource> ctx, String rawViewerId) {
-		return withViewerId(ctx, rawViewerId, (context, source, viewerId) -> {
-			UUID commandId = UUID.randomUUID();
-			context.parrotService().remove(commandId, viewerId)
-					.thenAccept(result -> CommandFeedback.send(source, result));
-			return 1;
-		});
+		return withViewerId(ctx, rawViewerId, (context, source, viewerId) ->
+				submit(context, source, viewerId, ParrotAction.REMOVE, ActionParameters.None.INSTANCE, null));
 	}
 
 	private static int rename(CommandContext<ServerCommandSource> ctx, String rawViewerId, String rawName) {
@@ -295,10 +317,7 @@ public final class ViewerParrotCommands {
 				source.sendError(errorText(ErrorCode.INVALID_ARGUMENT, e.getMessage()));
 				return 0;
 			}
-			UUID commandId = UUID.randomUUID();
-			context.parrotService().rename(commandId, viewerId, displayName)
-					.thenAccept(result -> CommandFeedback.send(source, result));
-			return 1;
+			return submit(context, source, viewerId, ParrotAction.RENAME, new ActionParameters.Name(displayName), null);
 		});
 	}
 
@@ -312,54 +331,42 @@ public final class ViewerParrotCommands {
 				return 0;
 			}
 
-			UUID commandId = UUID.randomUUID();
-			context.parrotService().setTrait(commandId, viewerId, trait)
-					.thenAccept(result -> {
+			return submit(context, source, viewerId, ParrotAction.TRAIT, new ActionParameters.Trait(trait), result -> {
 						CommandFeedback.send(source, result);
-						if (result.succeeded() && !trait.isActiveInMvp()) {
+						if (!trait.isActiveInMvp()) {
 							source.sendFeedback(() -> Text.literal(
 									trait + ": без эффекта в MVP"), false);
 						}
 					});
-			return 1;
 		});
 	}
 
 	private static int respawn(CommandContext<ServerCommandSource> ctx, String rawViewerId) {
-		return withViewerId(ctx, rawViewerId, (context, source, viewerId) -> {
-			UUID commandId = UUID.randomUUID();
-			context.parrotService().respawn(commandId, viewerId)
-					.thenAccept(result -> CommandFeedback.send(source, result));
-			return 1;
-		});
+		return withViewerId(ctx, rawViewerId, (context, source, viewerId) ->
+				submit(context, source, viewerId, ParrotAction.RESPAWN, ActionParameters.None.INSTANCE, null));
 	}
 
 	private static int reconcile(CommandContext<ServerCommandSource> ctx, String rawViewerId) {
-		return withViewerId(ctx, rawViewerId, (context, source, viewerId) -> {
-			CommandResult result = context.parrotService().reconcile(UUID.randomUUID(), viewerId);
-			CommandFeedback.send(source, result);
-			return result.succeeded() ? 1 : 0;
-		});
+		return withViewerId(ctx, rawViewerId, (context, source, viewerId) ->
+				submit(context, source, viewerId, ParrotAction.RECONCILE, ActionParameters.None.INSTANCE, null));
 	}
 
 	private static int info(CommandContext<ServerCommandSource> ctx, String rawViewerId) {
-		return withViewerId(ctx, rawViewerId, (context, source, viewerId) -> {
+		return withViewerId(ctx, rawViewerId, (context, source, viewerId) -> submit(context, source,
+				viewerId, ParrotAction.INFO, ActionParameters.None.INSTANCE, result -> {
 			Optional<ViewerParrotRecord> maybeRecord = context.registry().find(viewerId);
 			if (maybeRecord.isEmpty()) {
-				boolean removed = !context.registry().tombstonesFor(viewerId).isEmpty();
 				// Удалённая регистрация остаётся видимой как REMOVED: раздел 9.5 требует,
 				// чтобы info сообщал об этом, а не просто «не найдено».
-				source.sendError(removed
-						? Text.literal(viewerId + ": " + LifecycleState.REMOVED)
-						: errorText(ErrorCode.VIEWER_NOT_FOUND));
-				return 0;
+				richFeedback(source, result, viewerId + ": " + LifecycleState.REMOVED);
+				return;
 			}
 
 			ViewerParrotRecord record = maybeRecord.get();
-			boolean loaded = context.loadedIndex().isLoaded(viewerId);
 			var cooldowns = context.cooldowns().remainingFor(viewerId);
+			var runtime = context.runtimes().get(viewerId);
 
-			source.sendFeedback(() -> Text.literal(String.join("\n",
+			richFeedback(source, result, String.join("\n",
 					"viewerId: " + record.viewerId(),
 					"имя: " + record.viewer().displayName(),
 					"trait: " + record.trait() + (record.trait().isActiveInMvp() ? "" : " (без эффекта в MVP)"),
@@ -367,31 +374,29 @@ public final class ViewerParrotCommands {
 					"incarnation: " + record.incarnationId(),
 					"generation: " + record.generation(),
 					"physicalStatus: " + record.physicalStatus(),
-					"lifecycle: " + (loaded ? LifecycleState.LOADED : LifecycleState.UNLOADED),
+					"lifecycle: " + context.lifecycle(viewerId),
+					"behavior: " + (runtime == null ? "paused" : runtime.behavior()),
+					"behaviorFault: " + (runtime != null && runtime.isBehaviorDisabledByErrors()),
+					"operationPending: " + context.parrotService().operationPending(viewerId),
+					"pendingAction: " + (runtime == null ? "none" : runtime.pendingAction().map(Object::toString).orElse("none")),
 					"desiredBehavior: " + record.desiredBehavior(),
 					"ожидаемый entityUuid: " + record.expectedEntityUuid().map(UUID::toString).orElse("нет"),
 					"позиция: " + record.location().map(Object::toString).orElse("неизвестна"),
 					"revision: " + record.revision(),
-					"cooldowns: " + (cooldowns.isEmpty() ? "нет" : cooldowns.toString()))), false);
-			return 1;
-		});
+					"cooldowns: " + (cooldowns.isEmpty() ? "нет" : cooldowns.toString())));
+		}));
 	}
 
 	private static int list(ServerCommandSource source, int page) {
-		Optional<ServerContext> maybeContext = ServerContext.current();
-		if (maybeContext.isEmpty()) {
-			source.sendError(Text.literal("Мод не инициализирован"));
-			return 0;
-		}
-		ServerContext context = maybeContext.get();
+		return withContext(source, context -> submit(context, source, null, ParrotAction.LIST,
+				new ActionParameters.Page(page), result -> showList(context, source, page, result)));
+	}
 
+	private static void showList(ServerContext context, ServerCommandSource source, int page, CommandResult result) {
 		List<ViewerParrotRecord> all = context.registry().allSorted();
 		int totalPages = Math.max(1, (all.size() + PAGE_SIZE - 1) / PAGE_SIZE);
-		if (page > totalPages) {
-			source.sendError(Text.literal("Страниц всего " + totalPages));
-			return 0;
-		}
-
+		// Event listeners may change the registry between API admission and feedback.
+		if (page > totalPages) { richFeedback(source, result, "Страниц всего " + totalPages); return; }
 		int from = (page - 1) * PAGE_SIZE;
 		int to = Math.min(all.size(), from + PAGE_SIZE);
 		StringBuilder builder = new StringBuilder("Записей " + all.size()
@@ -405,47 +410,28 @@ public final class ViewerParrotCommands {
 					.append(", ").append(record.physicalStatus())
 					.append(context.loadedIndex().isLoaded(record.viewerId()) ? ", загружен" : "");
 		}
-		source.sendFeedback(() -> Text.literal(builder.toString()), false);
-		return all.size();
+		richFeedback(source, result, builder.toString());
 	}
 
 	private static int save(ServerCommandSource source) {
-		Optional<ServerContext> maybeContext = ServerContext.current();
-		if (maybeContext.isEmpty()) {
-			source.sendError(Text.literal("Мод не инициализирован"));
-			return 0;
-		}
-		ServerContext context = maybeContext.get();
-		if (!context.allowsMutations()) {
-			source.sendError(errorText(ErrorCode.STORAGE_UNAVAILABLE));
-			return 0;
-		}
-
-		// Итог сообщается после завершения записи, а не по факту приёма команды.
-		CheckpointScheduler.request(context).whenComplete((result, error) -> {
-			if (error != null) {
-				source.sendError(Text.literal("Checkpoint не выполнен: " + error.getMessage()));
-				return;
-			}
-			source.sendFeedback(() -> Text.literal("Checkpoint " + result.checkpointSequence()
-					+ " записан" + (result.atomicReplace() ? " атомарно" : " без атомарной замены")), true);
-		});
-		return 1;
+		return withContext(source, context -> submit(context, source, null, ParrotAction.SAVE,
+				ActionParameters.None.INSTANCE, null));
 	}
 
 	private static int status(ServerCommandSource source) {
-		Optional<ServerContext> maybeContext = ServerContext.current();
-		if (maybeContext.isEmpty()) {
-			source.sendError(Text.literal("Мод не инициализирован"));
-			return 0;
-		}
-		ServerContext context = maybeContext.get();
+		return withContext(source, context -> submit(context, source, null, ParrotAction.STATUS,
+				ActionParameters.None.INSTANCE, result -> showStatus(context, source, result)));
+	}
 
-		source.sendFeedback(() -> Text.literal(String.join("\n",
+	private static void showStatus(ServerContext context, ServerCommandSource source, CommandResult result) {
+		var records = context.registry().allSorted();
+		richFeedback(source, result, String.join("\n",
 				"хранилище: " + context.storageHealth()
 						+ context.storageFaultReason().map(reason -> " (" + reason + ")").orElse(""),
 				"записей: " + context.registry().size(),
 				"загружено: " + context.loadedIndex().size(),
+				"DEAD: " + records.stream().filter(record -> record.physicalStatus() == PhysicalStatus.DEAD).count(),
+				"MISSING: " + records.stream().filter(record -> record.physicalStatus() == PhysicalStatus.MISSING).count(),
 				"зарезервировано слотов: " + context.registry().reservedSlots()
 						+ " из " + context.config().maxActiveParrots(),
 				"незавершённых резервов: " + context.registry().pendingReservations(),
@@ -454,10 +440,77 @@ public final class ViewerParrotCommands {
 						+ " из " + Math.min(io.github.viewerparrots.lifecycle.EntityRecoveryService
 						.MAX_CONCURRENT_JOBS, context.config().recovery().maxConcurrentJobs()),
 				"изменения не в снимке: " + context.registry().isDirty(),
+				"dirty age: " + context.dirtyAgeTicks() + " ticks",
 				"checkpoint: " + context.repository().checkpointSequence(),
+				"writer queue: " + context.writer().queueDepth() + " / " + context.config().limits().queueCapacity(),
+				"runtime references: " + context.runtimes().size(),
+				"commands: " + context.commandService().diagnostics(),
+				"scheduler last tick: " + context.behaviorScheduler().lastTickNanos() + " ns",
 				"стример: " + context.streamerService().configuredUuid()
-						.map(UUID::toString).orElse("не назначен"))), false);
-		return 1;
+						.map(UUID::toString).orElse("не назначен")));
+	}
+
+	private static int reload(ServerCommandSource source) {
+		return withContext(source, context -> submit(context, source, null, ParrotAction.RELOAD,
+				ActionParameters.None.INSTANCE, null));
+	}
+
+	/** Typed facade owns admission, diagnostics budget, command events and error isolation. */
+	private static int submit(ServerContext context, ServerCommandSource source, ViewerId viewerId,
+			ParrotAction action, ActionParameters parameters, Consumer<CommandResult> successFeedback) {
+		UUID commandId = UUID.randomUUID();
+		long started = AuditLog.started();
+		try {
+			CompletableFuture<CommandResult> future = context.api().submit(
+					new CommandRequest(commandId, viewerId, action, parameters), toActor(source, context)).toCompletableFuture();
+			if (future.isDone()) {
+				CommandResult result = future.getNow(null);
+				feedback(source, result, successFeedback);
+				return result.succeeded() || result.status() == CommandStatus.ACCEPTED ? 1 : 0;
+			}
+			CommandResult accepted = action.countsTowardActionBudget()
+					? context.commandService().resultCache().find(commandId)
+						.filter(result -> result.status() == CommandStatus.ACCEPTED).orElse(null) : null;
+			if (accepted == null) accepted = new CommandResult(commandId, CommandStatus.ACCEPTED, null,
+					"viewerparrots.api.accepted", Map.of(), 0);
+			CommandFeedback.send(source, accepted);
+			future.whenComplete((result, error) -> {
+				if (error != null) internalError(context, source, commandId, viewerId, action, started, error);
+				else {
+					try { feedback(source, result, successFeedback); }
+					catch (RuntimeException failure) { internalError(context, source, commandId, viewerId, action, started, failure); }
+				}
+			});
+			return 1;
+		} catch (RuntimeException error) {
+			internalError(context, source, commandId, viewerId, action, started, error);
+			return 0;
+		}
+	}
+
+	private static void feedback(ServerCommandSource source, CommandResult result, Consumer<CommandResult> successFeedback) {
+		if (result.succeeded() && successFeedback != null) successFeedback.accept(result);
+		else CommandFeedback.send(source, result);
+	}
+
+	private static void internalError(ServerContext context, ServerCommandSource source, UUID commandId,
+			ViewerId viewerId, ParrotAction action, long started, Throwable error) {
+		AuditLog.Context identity = viewerId == null ? AuditLog.Context.viewer(commandId, null, action.name())
+				: context.registry().find(viewerId).map(record -> AuditLog.Context.of(commandId, record, action.name()))
+				.orElseGet(() -> AuditLog.Context.viewer(commandId, viewerId, action.name()));
+		AuditLog.error("command_adapter_failed", identity, "FAILED", ErrorCode.INTERNAL_ERROR.name(), started, Map.of(), error);
+		CommandFeedback.send(source, CommandResult.failed(commandId, ErrorCode.INTERNAL_ERROR, commandId.toString()));
+	}
+
+	private static void richFeedback(ServerCommandSource source, CommandResult result, String text) {
+		source.sendFeedback(() -> Text.literal("[" + result.commandId() + "] " + text), false);
+	}
+
+	private interface ContextAction { int run(ServerContext context); }
+	private static int withContext(ServerCommandSource source, ContextAction action) {
+		Optional<ServerContext> context = ServerContext.current();
+		if (context.isEmpty()) { source.sendError(Text.literal("Мод не инициализирован")); return 0; }
+		return action.run(context.get());
 	}
 
 	// --- вспомогательное -----------------------------------------------------
@@ -471,7 +524,7 @@ public final class ViewerParrotCommands {
 	}
 
 	private static Text errorText(ErrorCode code, String detail) {
-		return Text.translatableWithFallback(code.messageKey(), code.name() + ": " + detail);
+		return Text.translatableWithFallback(code.messageKey(), code.name() + ": " + AuditLog.safeText(detail));
 	}
 
 	private interface ViewerIdAction {
@@ -506,7 +559,7 @@ public final class ViewerParrotCommands {
 			return source.hasPermissionLevel(action.requiresAdmin() ? 3 : 2);
 		}
 		ActorContext actor = toActor(source, context.get());
-		return context.get().permissions().isAllowed(actor, action);
+		return context.get().acceptingCommands() && context.get().permissions().isAllowed(actor, action);
 	}
 
 	private static ActorContext toActor(ServerCommandSource source, ServerContext context) {

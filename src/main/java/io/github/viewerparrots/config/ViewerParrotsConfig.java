@@ -32,6 +32,12 @@ public record ViewerParrotsConfig(
 		Storage storage
 ) {
 	public static final int CURRENT_SCHEMA_VERSION = 1;
+	public static final List<String> PARROT_CALL_SOUND_IDS = List.of(
+			"viewerparrots:parrot.call_01",
+			"viewerparrots:parrot.call_12",
+			"viewerparrots:parrot.call_14",
+			"viewerparrots:parrot.call_15",
+			"viewerparrots:parrot.call_27");
 
 	public ViewerParrotsConfig {
 		Objects.requireNonNull(deathMode, "deathMode");
@@ -115,10 +121,7 @@ public record ViewerParrotsConfig(
 				// повторить танец можно ровно в момент его окончания.
 				new Dance(200),
 				new Cooldowns(100, 20, 0, 200, 300, 200),
-				new Sound(0.8, 0.9, 1.1, List.of(
-						"minecraft:entity.zombie.ambient",
-						"minecraft:entity.skeleton.ambient",
-						"minecraft:entity.creeper.primed")),
+				new Sound(0.8, 1.0, 1.0, PARROT_CALL_SOUND_IDS),
 				new Behavior(true, 600, 2400, 20, 8, 20, 100, 0.1, 0.5, weights),
 				new Limits(20, 4, 256),
 				new Recovery(2, 100),

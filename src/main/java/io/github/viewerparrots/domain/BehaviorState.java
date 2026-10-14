@@ -5,16 +5,19 @@ package io.github.viewerparrots.domain;
  */
 public enum BehaviorState {
 	IDLE,
+	FREE,
+	FREEFOLLOW,
 	SITTING,
 	FOLLOWING,
 	RETURNING,
-	DANCING;
+	DANCING,
+	SHOULDER;
 
 	/**
 	 * Временные состояния: отменяются при unload, смерти, удалении и рестарте и никогда
 	 * не становятся {@link DesiredBehavior}.
 	 */
 	public boolean isTransient() {
-		return this == RETURNING || this == DANCING;
+		return this == RETURNING || this == DANCING || this == SHOULDER;
 	}
 }

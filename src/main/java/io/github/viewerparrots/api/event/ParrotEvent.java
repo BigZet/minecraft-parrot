@@ -13,6 +13,8 @@ import java.util.UUID;
  * <p>Событие публикуется на server thread ПОСЛЕ соответствующего изменения, а для durable
  * операций — после commit. Доставка через рестарт не гарантируется: это уведомление,
  * а не журнал.
+ * <p>У глобальных COMMAND_* событий (например SAVE или SETSTREAMER) viewerId отсутствует.
+ * События сущности и lifecycle всегда требуют viewerId.
  */
 public record ParrotEvent(
 		UUID eventId,
@@ -44,7 +46,8 @@ public record ParrotEvent(
 	public ParrotEvent {
 		Objects.requireNonNull(eventId, "eventId");
 		Objects.requireNonNull(type, "type");
-		Objects.requireNonNull(viewerId, "viewerId");
+		if (type != Type.COMMAND_ACCEPTED && type != Type.COMMAND_COMPLETED && type != Type.COMMAND_REJECTED)
+			Objects.requireNonNull(viewerId, "viewerId");
 		Objects.requireNonNull(timestamp, "timestamp");
 	}
 

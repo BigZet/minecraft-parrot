@@ -56,11 +56,13 @@ public class SitStillGoal extends Goal {
 	@Override
 	public void stop() {
 		this.parrot.setInSittingPose(false);
-		this.parrot.getNavigation().stop();
+		if (isSitting()) this.parrot.getNavigation().stop();
 	}
 
 	@Override
 	public void tick() {
+		// Eligibility is not checked on MobEntity's alternate tickGoals(false) pass.
+		if (!isSitting()) return;
 		this.parrot.getNavigation().stop();
 		this.parrot.setMovementSpeed(0.0f);
 

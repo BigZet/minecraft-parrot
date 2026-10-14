@@ -1,0 +1,7 @@
+{
+  "required": true,
+  "package": "io.github.viewerparrots.gametest.bootstrap",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": ["ConfigIoGateMixin", "RegistryIoGateMixin"],
+  "injectors": {"defaultRequire": 1}
+}

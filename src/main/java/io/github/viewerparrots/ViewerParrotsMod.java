@@ -3,6 +3,10 @@ package io.github.viewerparrots;
 import io.github.viewerparrots.bootstrap.FabricLifecycleAdapter;
 import io.github.viewerparrots.command.ViewerParrotCommands;
 import io.github.viewerparrots.entity.ModEntities;
+import io.github.viewerparrots.diagnostics.AuditLog;
+import io.github.viewerparrots.network.ClientCompatibility;
+import io.github.viewerparrots.network.SpeechAudioPayload;
+import io.github.viewerparrots.service.ModSounds;
 import net.fabricmc.api.ModInitializer;
 import net.minecraft.util.Identifier;
 import org.slf4j.Logger;
@@ -22,9 +26,14 @@ public class ViewerParrotsMod implements ModInitializer {
 
 	@Override
 	public void onInitialize() {
+		long started = AuditLog.started();
 		ModEntities.register();
+		ModSounds.register();
+		SpeechAudioPayload.register();
+		ClientCompatibility.register();
 		FabricLifecycleAdapter.register();
 		ViewerParrotCommands.register();
-		LOGGER.info("Viewer Parrots: common initialization complete");
+		AuditLog.info("common_initialized", null, "READY", null, started,
+				java.util.Map.of("minecraft", "1.21.1"), null);
 	}
 }

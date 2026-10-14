@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Parrot Voice Lab — тест голоса</title>
+  <style>
+    :root {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      color: #f2f5ed;
+      background: #101310;
+      font-synthesis: none;
+      --muted: #a2afa0;
+      --lime: #d0f58e;
+      --line: #303a30;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(ellipse at 90% 0%, #302a4238, transparent 45%),
+        radial-gradient(ellipse at 5% 35%, #45632a20, transparent 45%), #101310;
+    }
+    button, input, select, textarea { font: inherit; }
+    button, select { cursor: pointer; }
+    a { color: inherit; }
+    [hidden] { display: none !important; }
+    :focus-visible { outline: 3px solid var(--lime); outline-offset: 4px; }
+    .shell { max-width: 1160px; margin: 0 auto; padding: 38px 32px 26px; }
+    .topbar { display: flex; justify-content: space-between; align-items: center; gap: 20px; }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-mark {
+      display: grid; place-items: center; width: 42px; height: 42px;
+      border: 1px solid #8fa96366; border-radius: 14px;
+      background: #c4e98b10; color: var(--lime);
+    }
+    .brand-name { font-size: 14px; letter-spacing: .08em; font-weight: 700; }
+    .brand-sub { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; }
+    .connection {
+      display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px;
+      color: var(--muted); font-size: 12px; border: 1px solid var(--line); border-radius: 30px;
+    }
+    .connection-dot { width: 6px; height: 6px; border-radius: 50%; background: #81907e; }
+    .connection[data-state="ready"] { color: var(--lime); border-color: #8caa5a50; }
+    .connection[data-state="ready"] .connection-dot { background: var(--lime); }
+    .connection[data-state="missing"] { color: #efc5ad; }
+    .connection[data-state="missing"] .connection-dot { background: #efc5ad; }
+    .intro { margin: 52px 0 30px; max-width: 690px; }
+    .eyebrow { margin: 0 0 12px; font-size: 11px; letter-spacing: .16em; color: var(--lime); font-weight: 700; }
+    h1 { margin: 0; font-size: clamp(30px, 4vw, 45px); line-height: 1.15; letter-spacing: -.04em; font-weight: 650; }
+    .intro p:last-child { margin: 16px 0 0; color: var(--muted); font-size: 15px; line-height: 1.65; }
+    .workspace { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: 22px; align-items: start; }
+    .panel { border: 1px solid var(--line); border-radius: 22px; overflow: hidden; background: #181d18; }
+    .panel-head { display: flex; align-items: center; gap: 10px; padding: 23px 26px 0; }
+    .step { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 7px; background: #2b3626; color: var(--lime); font-size: 11px; font-weight: 700; }
+    h2 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -.015em; }
+    form { padding: 25px 26px 26px; }
+    .field { margin-bottom: 21px; }
+    .field-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+    label { display: block; margin-bottom: 8px; font-size: 13px; font-weight: 600; }
+    .optional { color: #84917f; font-size: 11px; font-weight: 400; }
+    input, select, textarea {
+      display: block; width: 100%; min-width: 0; color: #edf2e7;
+      border: 1px solid #394438; border-radius: 10px; background: #111611;
+      padding: 12px 13px; transition: border-color .15s, background .15s;
+    }
+    input:hover, select:hover, textarea:hover { border-color: #64715b; }
+    input:focus, select:focus, textarea:focus { border-color: #a3c575; outline: 2px solid #b2d77725; outline-offset: 0; }
+    select { padding-right: 32px; }
+    option { background: #181d18; color: #edf2e7; }
+    #voice-id { font-family: Consolas, "Courier New", monospace; font-size: 14px; }
+    textarea { resize: vertical; min-height: 132px; line-height: 1.65; font-size: 14px; }
+    .field-hint { margin: 8px 0 0; color: #84917f; font-size: 12px; line-height: 1.5; }
+    .char-count { color: #84917f; font-size: 11px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .char-count[data-limit="true"] { color: #edc38b; }
+    .submit-button {
+      width: 100%; display: flex; align-items: center; justify-content: center; gap: 9px;
+      padding: 14px 18px; border: 1px solid transparent; border-radius: 11px;
+      background: var(--lime); color: #223012; font-weight: 650; font-size: 14px;
+      transition: background .15s, transform .15s;
+    }
+    .submit-button:hover:not(:disabled) { background: #e0ffae; transform: translateY(-1px); }
+    .submit-button:active:not(:disabled) { transform: translateY(0); }
+    .submit-button:disabled { opacity: .58; cursor: default; }
+    .spinner { width: 17px; height: 17px; border: 2px solid #22301250; border-top-color: #223012; border-radius: 50%; animation: spin .8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .paid-note { display: flex; align-items: start; gap: 7px; margin: 12px 0 0; color: #84917f; font-size: 11px; line-height: 1.6; }
+    .paid-note svg { flex: none; margin-top: 2px; }
+    .request-status { margin: 12px 0 0; color: var(--lime); font-size: 12px; line-height: 1.5; }
+    .error { margin: 14px 0 0; padding: 12px 14px; border: 1px solid #875240; border-radius: 10px; background: #41292150; color: #ffd3c1; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+    .result-panel { background: linear-gradient(145deg, #1e241d, #171b19 65%); }
+    .result-content { padding: 28px 26px 26px; }
+    .sound-stage {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-height: 230px; padding: 30px 20px; border: 1px solid #343e31;
+      border-radius: 15px; background: radial-gradient(ellipse at 50% 75%, #b9de7b0e, transparent 65%), #11161190;
+      text-align: center;
+    }
+    .sound-icon { display: grid; place-items: center; width: 70px; height: 70px; border: 1px solid #93a46e44; border-radius: 23px; background: #b8d77d0b; color: var(--lime); }
+    .sound-stage h3 { margin: 20px 0 8px; font-size: 15px; font-weight: 600; }
+    .sound-stage p { margin: 0; max-width: 260px; font-size: 12px; line-height: 1.65; color: var(--muted); }
+    .waveform { display: flex; height: 66px; align-items: center; justify-content: center; gap: 5px; margin-bottom: 24px; color: var(--lime); }
+    .waveform span { display: block; width: 4px; height: var(--height); border-radius: 5px; background: currentColor; opacity: .7; }
+    .waveform span:nth-child(3n) { color: #a697c4; }
+    .result-ready-title { margin: 0 0 7px; font-size: 17px; letter-spacing: -.02em; font-weight: 600; }
+    .result-ready-hint { margin: 0 0 22px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+    audio { display: block; width: 100%; height: 46px; }
+    .audio-note { margin: 10px 0 0; color: #bbc8b1; font-size: 12px; line-height: 1.5; }
+    .download-link { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 17px; padding: 12px; border: 1px solid #495c3a; border-radius: 10px; color: var(--lime); text-decoration: none; font-size: 12px; font-weight: 600; }
+    .download-link:hover { background: #b7d58f0c; border-color: #91ae64; }
+    .result-details { margin: 24px 0 0; padding-top: 19px; border-top: 1px solid var(--line); }
+    .result-details > div { display: grid; grid-template-columns: 70px minmax(0, 1fr); gap: 12px; margin: 0 0 11px; font-size: 12px; line-height: 1.5; }
+    .result-details > div:last-child { margin-bottom: 0; }
+    .result-details dt { color: #84917f; }
+    .result-details dd { margin: 0; color: #cbd7c2; overflow-wrap: anywhere; }
+    .result-details dd code { font-family: Consolas, "Courier New", monospace; font-size: 11px; }
+    .key-note { display: flex; align-items: start; gap: 9px; margin: 19px 0 0; color: #84917f; font-size: 12px; line-height: 1.6; }
+    .key-note svg { flex: none; margin-top: 2px; color: #a697c4; }
+    .footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 26px 2px 0; font-size: 11px; color: #6e7b6c; }
+    .footer span:last-child { color: #8d9d82; }
+    @media (max-width: 800px) {
+      .workspace { grid-template-columns: minmax(0, 1fr); }
+      .intro { margin-top: 38px; }
+      .sound-stage { min-height: 190px; }
+    }
+    @media (max-width: 480px) {
+      .shell { padding: 22px 16px; }
+      .topbar { align-items: start; gap: 10px; }
+      .brand-name { font-size: 12px; letter-spacing: .035em; }
+      .brand-mark { width: 36px; height: 36px; border-radius: 11px; }
+      .connection { max-width: 140px; padding: 7px 9px; font-size: 10px; }
+      .connection-dot { flex: none; }
+      .intro { margin: 33px 0 24px; }
+      .intro p:last-child { font-size: 14px; }
+      .panel-head { padding: 21px 20px 0; }
+      form, .result-content { padding: 23px 20px; }
+      .panel { border-radius: 17px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; transition: none !important; }
+    }
+  </style>
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg width="25" height="25" viewBox="0 0 24 24" fill="none"><path d="M6 14c0-5 2-9 7-9a5 5 0 0 1 5 5v3l3 2-5 1v2a3 3 0 0 1-3 3h-2l-5-7Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="m6 14-3 5h8M12 18v3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="15" cy="9" r="1" fill="currentColor"/></svg>
+        </div>
+        <div><span class="brand-name">PARROT VOICE LAB</span><span class="brand-sub">ElevenLabs · OpenRouter</span></div>
+      </div>
+      <div id="connection" class="connection" data-state="checking" role="status">
+        <span class="connection-dot" aria-hidden="true"></span><span id="connection-text">Проверяем подключение</span>
+      </div>
+    </header>
+
+    <main>
+      <div class="intro">
+        <p class="eyebrow">ГОЛОС ДЛЯ ВАШЕГО ПОПУГАЯ</p>
+        <h1>Сначала послушаем.</h1>
+        <p>Введите voice_id, напишите реплику и послушайте, как она звучит. Попробуйте несколько голосов — найдите своего Кешу.</p>
+      </div>
+
+      <div class="workspace">
+        <section class="panel" aria-labelledby="setup-title">
+          <div class="panel-head"><span class="step" aria-hidden="true">01</span><h2 id="setup-title">Настройте голос</h2></div>
+          <form id="speech-form">
+            <div class="field">
+              <div class="field-top"><label for="voice-preset">Готовые голоса</label><span class="optional">необязательно</span></div>
+              <select id="voice-preset">
+                <option value="">Свой voice_id</option>
+                <option value="george" selected>George — стандартный</option>
+                <option value="Srw6vQ7MN1QkYRTbljvM">The Wild Scavenger</option>
+                <option value="p8a0OoXEQdNSqzxFK6Mz">The Manhattan Speedster</option>
+                <option value="3JKyte7xu5TgVftLjjo6">The Eccentric Inventor</option>
+                <option value="zjWL070ebPabNIVEDVBk">The Enthusiastic Pixie</option>
+                <option value="9yzdeviXkFddZ4Oz8Mok">Lutz</option>
+                <option value="LRpNiUBlcqgIsKUzcrlN">Georg</option>
+                <option value="U5bwJIltlTkyuYdRPR9L">The Wise Whistler</option>
+                <option value="kwajW3Xh5svCeKU5ky2S">Dmitry</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="voice-id">voice_id</label>
+              <input id="voice-id" name="voice_id" value="george" required spellcheck="false" autocomplete="off" aria-describedby="voice-hint">
+              <p id="voice-hint" class="field-hint">Можно вставить любой ID голоса из ElevenLabs.</p>
+            </div>
+            <div class="field">
+              <label for="model">Модель</label>
+              <select id="model" name="model">
+                <option value="elevenlabs/eleven-v4-turbo" selected>Eleven v4 Turbo</option>
+                <option value="elevenlabs/eleven-v4">Eleven v4</option>
+                <option value="elevenlabs/eleven-flash-v2.5">Eleven Flash v2.5</option>
+                <option value="elevenlabs/eleven-multilingual-v2">Eleven Multilingual v2</option>
+              </select>
+            </div>
+            <div class="field">
+              <div class="field-top"><label for="speech-text">Что скажет попугай?</label><span id="char-count" class="char-count">0 / 1000</span></div>
+              <textarea id="speech-text" name="text" maxlength="1000" required aria-describedby="char-count">Привет! Я попугай. Где мои семечки? Кеша хочет кушать!</textarea>
+            </div>
+            <button id="submit-button" class="submit-button" type="submit" aria-busy="false">
+              <svg id="submit-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m11 5-6 4H2v6h3l6 4V5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+              <span id="submit-spinner" class="spinner" aria-hidden="true" hidden></span><span id="submit-label">Озвучить</span>
+            </button>
+            <p class="paid-note"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6" stroke="currentColor"/><path d="M8 7v4m0-6v.1" stroke="currentColor" stroke-linecap="round"/></svg>Озвучка оплачивается с вашего баланса. Каждый запуск создаёт новое аудио.</p>
+            <p id="request-status" class="request-status" role="status" hidden></p>
+            <p id="error-message" class="error" role="alert" hidden></p>
+          </form>
+        </section>
+
+        <section class="panel result-panel" aria-labelledby="result-title">
+          <div class="panel-head"><span class="step" aria-hidden="true">02</span><h2 id="result-title">Послушайте результат</h2></div>
+          <div class="result-content">
+            <div id="empty-result" class="sound-stage">
+              <div class="sound-icon" aria-hidden="true"><svg width="31" height="31" viewBox="0 0 32 32" fill="none"><path d="M6 18v-4a10 10 0 0 1 20 0v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><rect x="4" y="16" width="6" height="10" rx="3" stroke="currentColor" stroke-width="1.8"/><rect x="22" y="16" width="6" height="10" rx="3" stroke="currentColor" stroke-width="1.8"/></svg></div>
+              <h3>Здесь появится голос</h3>
+              <p>Нажмите «Озвучить», а затем послушайте реплику или скачайте её в MP3.</p>
+            </div>
+            <div id="audio-result" hidden>
+              <div class="waveform" aria-hidden="true"><span style="--height: 14px"></span><span style="--height: 25px"></span><span style="--height: 41px"></span><span style="--height: 26px"></span><span style="--height: 54px"></span><span style="--height: 36px"></span><span style="--height: 64px"></span><span style="--height: 46px"></span><span style="--height: 29px"></span><span style="--height: 53px"></span><span style="--height: 38px"></span><span style="--height: 66px"></span><span style="--height: 43px"></span><span style="--height: 57px"></span><span style="--height: 33px"></span><span style="--height: 47px"></span><span style="--height: 24px"></span><span style="--height: 16px"></span></div>
+              <h3 class="result-ready-title">Последний успешный результат</h3>
+              <p class="result-ready-hint">Послушайте голос — или сохраните реплику себе.</p>
+              <audio id="audio-player" controls preload="metadata" aria-label="Озвученная реплика"></audio>
+              <p id="audio-note" class="audio-note" role="status" hidden></p>
+              <a id="download-link" class="download-link" download="parrot.mp3"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Скачать MP3</a>
+              <dl class="result-details">
+                <div><dt>Голос</dt><dd><code id="result-voice"></code></dd></div>
+                <div><dt>Модель</dt><dd><code id="result-model"></code></dd></div>
+              </dl>
+            </div>
+            <p class="key-note"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="3" stroke="currentColor" stroke-width="1.6"/><path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="15" r="1" fill="currentColor"/></svg><span id="key-note">Проверяем, готов ли ключ к озвучке.</span></p>
+          </div>
+        </section>
+      </div>
+    </main>
+    <footer class="footer"><span>Маленькая лаборатория больших попугайских реплик.</span><span>Генерация запускается только по кнопке</span></footer>
+  </div>
+</body>
+</html>

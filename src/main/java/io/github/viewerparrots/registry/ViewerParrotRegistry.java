@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -28,8 +29,11 @@ import java.util.UUID;
  */
 public final class ViewerParrotRegistry {
 	private final Map<ViewerId, ViewerParrotRecord> records = new TreeMap<>();
+	private final Map<ViewerId, ViewerParrotRecord> byViewerId = new HashMap<>();
 	private final Map<UUID, ViewerId> byEntityUuid = new HashMap<>();
 	private final Map<UUID, Tombstone> tombstonesByIncarnation = new LinkedHashMap<>();
+	private final PersistentSnapshotIndex<ViewerId, ViewerParrotRecord> snapshotRecords = new PersistentSnapshotIndex<>();
+	private final PersistentSnapshotIndex<UUID, Tombstone> snapshotTombstones = new PersistentSnapshotIndex<>();
 
 	private UUID streamerPlayerUuid;
 
@@ -41,9 +45,11 @@ public final class ViewerParrotRegistry {
 	 * каждые 30 секунд именно при dirty, а не безусловно.
 	 */
 	private boolean dirty;
+	private long changeEpoch;
+	private long appliedJournalSequence;
 
 	public Optional<ViewerParrotRecord> find(ViewerId viewerId) {
-		return Optional.ofNullable(this.records.get(viewerId));
+		return Optional.ofNullable(this.byViewerId.get(viewerId));
 	}
 
 	public Optional<ViewerParrotRecord> findByEntityUuid(UUID entityUuid) {
@@ -52,12 +58,93 @@ public final class ViewerParrotRegistry {
 	}
 
 	public boolean contains(ViewerId viewerId) {
-		return this.records.containsKey(viewerId);
+		return this.byViewerId.containsKey(viewerId);
 	}
 
 	/** Записи в порядке viewerId — раздел 6 требует такой сортировки для {@code list}. */
 	public List<ViewerParrotRecord> allSorted() {
 		return List.copyOf(this.records.values());
+	}
+
+	/** A server-thread cursor that copies only a bounded portion per tick. */
+	public SnapshotCapture beginSnapshot() {
+		return new SnapshotCapture();
+	}
+
+	public final class SnapshotCapture {
+		private long epoch;
+		private long sequence;
+		private UUID streamer;
+		private Iterator<ViewerParrotRecord> recordIterator;
+		private Iterator<Tombstone> tombstoneIterator;
+		private ArrayList<ViewerParrotRecord> copiedRecords;
+		private ArrayList<Tombstone> copiedTombstones;
+		private Snapshot snapshot;
+		private int lastStepCopies;
+
+		private SnapshotCapture() { captureGeneration(); }
+
+		private void captureGeneration() {
+			this.epoch = changeEpoch;
+			this.sequence = appliedJournalSequence;
+			this.streamer = streamerPlayerUuid;
+			this.recordIterator = snapshotRecords.iterator();
+			this.tombstoneIterator = snapshotTombstones.iterator();
+			this.copiedRecords = new ArrayList<>();
+			this.copiedTombstones = new ArrayList<>();
+		}
+
+		public boolean advance(int budget) {
+			if (budget < 1) throw new IllegalArgumentException("snapshot budget must be positive");
+			this.lastStepCopies = 0;
+			if (complete()) return true;
+			// Immutable roots preserve the original generation even during continuous writes.
+			while (this.lastStepCopies < budget && this.recordIterator.hasNext()) {
+				this.copiedRecords.add(this.recordIterator.next());
+				this.lastStepCopies++;
+			}
+			while (this.lastStepCopies < budget && this.tombstoneIterator.hasNext()) {
+				this.copiedTombstones.add(this.tombstoneIterator.next());
+				this.lastStepCopies++;
+			}
+			if (!this.recordIterator.hasNext() && !this.tombstoneIterator.hasNext()) {
+				// Ownership transfers to an immutable snapshot; never mutate these lists again.
+				this.snapshot = new Snapshot(this.copiedRecords, this.copiedTombstones,
+						this.streamer, this.epoch, this.sequence);
+				this.recordIterator = null;
+				this.tombstoneIterator = null;
+			}
+			return complete();
+		}
+
+		public boolean complete() { return this.snapshot != null; }
+		public int lastStepCopies() { return this.lastStepCopies; }
+		public Snapshot snapshot() {
+			if (!complete()) throw new IllegalStateException("snapshot capture is incomplete");
+			return this.snapshot;
+		}
+	}
+
+	/** Contains immutable domain values, without a reference back to the live registry. */
+	public static final class Snapshot {
+		private final List<ViewerParrotRecord> records;
+		private final List<Tombstone> tombstones;
+		private final UUID streamer;
+		private final long epoch;
+		private final long appliedSequence;
+		private Snapshot(List<ViewerParrotRecord> records, List<Tombstone> tombstones,
+				UUID streamer, long epoch, long appliedSequence) {
+			this.records = Collections.unmodifiableList(records);
+			this.tombstones = Collections.unmodifiableList(tombstones);
+			this.streamer = streamer;
+			this.epoch = epoch;
+			this.appliedSequence = appliedSequence;
+		}
+		public List<ViewerParrotRecord> records() { return this.records; }
+		public List<Tombstone> tombstones() { return this.tombstones; }
+		public UUID streamer() { return this.streamer; }
+		public long epoch() { return this.epoch; }
+		public long appliedSequence() { return this.appliedSequence; }
 	}
 
 	public int size() {
@@ -72,13 +159,15 @@ public final class ViewerParrotRegistry {
 	public void put(ViewerParrotRecord record) {
 		Objects.requireNonNull(record, "record");
 		ViewerId viewerId = record.viewerId();
-		if (this.records.containsKey(viewerId)) {
+		if (this.byViewerId.containsKey(viewerId)) {
 			throw new IllegalStateException("viewerId уже зарегистрирован: " + viewerId);
 		}
 		checkEntityUuidFree(record, viewerId);
 		this.records.put(viewerId, record);
+		this.byViewerId.put(viewerId, record);
+		this.snapshotRecords.put(viewerId, record);
 		record.expectedEntityUuid().ifPresent(uuid -> this.byEntityUuid.put(uuid, viewerId));
-		this.dirty = true;
+		markDirty();
 	}
 
 	/**
@@ -89,7 +178,7 @@ public final class ViewerParrotRegistry {
 	public void replace(ViewerParrotRecord updated) {
 		Objects.requireNonNull(updated, "updated");
 		ViewerId viewerId = updated.viewerId();
-		ViewerParrotRecord existing = this.records.get(viewerId);
+		ViewerParrotRecord existing = this.byViewerId.get(viewerId);
 		if (existing == null) {
 			throw new IllegalStateException("нечего заменять, viewerId не зарегистрирован: " + viewerId);
 		}
@@ -105,8 +194,10 @@ public final class ViewerParrotRegistry {
 
 		existing.expectedEntityUuid().ifPresent(this.byEntityUuid::remove);
 		this.records.put(viewerId, updated);
+		this.byViewerId.put(viewerId, updated);
+		this.snapshotRecords.put(viewerId, updated);
 		updated.expectedEntityUuid().ifPresent(uuid -> this.byEntityUuid.put(uuid, viewerId));
-		this.dirty = true;
+		markDirty();
 	}
 
 	/**
@@ -119,17 +210,21 @@ public final class ViewerParrotRegistry {
 		if (existing == null) {
 			return Optional.empty();
 		}
+		this.byViewerId.remove(viewerId);
+		this.snapshotRecords.remove(viewerId);
 		existing.expectedEntityUuid().ifPresent(this.byEntityUuid::remove);
 		Tombstone tombstone = Tombstone.of(existing, removedAt);
-		this.dirty = true;
+		markDirty();
 		this.tombstonesByIncarnation.put(tombstone.incarnationId(), tombstone);
+		this.snapshotTombstones.put(tombstone.incarnationId(), tombstone);
 		return Optional.of(tombstone);
 	}
 
 	public void addTombstone(Tombstone tombstone) {
 		Objects.requireNonNull(tombstone, "tombstone");
 		this.tombstonesByIncarnation.put(tombstone.incarnationId(), tombstone);
-		this.dirty = true;
+		this.snapshotTombstones.put(tombstone.incarnationId(), tombstone);
+		markDirty();
 	}
 
 	/**
@@ -208,6 +303,37 @@ public final class ViewerParrotRegistry {
 		this.dirty = false;
 	}
 
+	public long changeEpoch() {
+		return this.changeEpoch;
+	}
+
+	public void markClean(long capturedEpoch) {
+		if (this.changeEpoch == capturedEpoch) {
+			this.dirty = false;
+		}
+	}
+
+	private void markDirty() {
+		this.dirty = true;
+		this.changeEpoch++;
+	}
+
+	public long appliedJournalSequence() {
+		return this.appliedJournalSequence;
+	}
+
+	public void initializeAppliedJournalSequence(long sequence) {
+		if (sequence < 0) throw new IllegalArgumentException("negative journal sequence");
+		this.appliedJournalSequence = sequence;
+	}
+
+	public void journalApplied(long sequence) {
+		if (sequence < this.appliedJournalSequence) {
+			throw new IllegalStateException("journal callback out of order: " + sequence);
+		}
+		this.appliedJournalSequence = sequence;
+	}
+
 	// --- Целевой стример ----------------------------------------------------
 
 	public Optional<UUID> streamerPlayerUuid() {
@@ -216,16 +342,21 @@ public final class ViewerParrotRegistry {
 
 	public void setStreamerPlayerUuid(UUID playerUuid) {
 		this.streamerPlayerUuid = playerUuid;
-		this.dirty = true;
+		markDirty();
 	}
 
 	/** Полная замена содержимого после загрузки снимка и replay журнала. */
 	public void replaceAll(List<ViewerParrotRecord> loadedRecords, List<Tombstone> loadedTombstones,
 			UUID streamerUuid) {
 		this.records.clear();
+		this.byViewerId.clear();
 		this.byEntityUuid.clear();
 		this.tombstonesByIncarnation.clear();
+		this.snapshotRecords.clear();
+		this.snapshotTombstones.clear();
+		markDirty();
 		this.pendingReservations = 0;
+		this.appliedJournalSequence = 0;
 		this.streamerPlayerUuid = streamerUuid;
 
 		for (ViewerParrotRecord record : loadedRecords) {

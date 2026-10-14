@@ -1,6 +1,7 @@
 package io.github.viewerparrots.service;
 
 import io.github.viewerparrots.ViewerParrotsMod;
+import io.github.viewerparrots.diagnostics.AuditLog;
 import io.github.viewerparrots.config.ViewerParrotsConfig;
 import io.github.viewerparrots.entity.ViewerParrotEntity;
 import net.minecraft.registry.Registries;
@@ -15,11 +16,11 @@ import java.util.Optional;
 import java.util.Random;
 
 /**
- * Воспроизведение разрешённых ванильных звуков (раздел 10 ТЗ).
+ * Воспроизведение случайного звука из настроенного списка.
  *
  * <p>Звук отправляется сервером один раз из координат попугая; клиент не дублирует его
- * локально. Произвольные аудиофайлы и TTS в MVP не входят — играются только события
- * из белого списка конфигурации.
+ * локально. По умолчанию список содержит пять встроенных записей настоящих
+ * попугаев; каждая выбирается с одинаковой вероятностью.
  */
 public final class SoundService {
 	private final ViewerParrotsConfig config;
@@ -74,18 +75,30 @@ public final class SoundService {
 	}
 
 	private static List<SoundEvent> resolve(List<String> ids) {
+		long started = AuditLog.started();
 		List<SoundEvent> resolved = new ArrayList<>(ids.size());
+		List<String> unavailable = new ArrayList<>();
 		for (String id : ids) {
 			Identifier identifier = Identifier.tryParse(id);
-			SoundEvent event = identifier == null ? null : Registries.SOUND_EVENT.get(identifier);
+			SoundEvent event = identifier == null || !Registries.SOUND_EVENT.containsId(identifier)
+					? null : Registries.SOUND_EVENT.get(identifier);
 			if (event == null) {
 				// Валидация конфига уже могла это отсеять, но реестр доступен только
 				// в рантайме, поэтому здесь остаётся предупреждение, а не отказ.
-				ViewerParrotsMod.LOGGER.warn("Звук {} отсутствует в реестре и не будет использован", id);
+				unavailable.add(id);
 				continue;
 			}
 			resolved.add(event);
 		}
+		if (!unavailable.isEmpty()) {
+			AuditLog.warn("sound_unavailable", null, "SKIPPED", "UNKNOWN_SOUND", started,
+					java.util.Map.of("soundIds", unavailable), null);
+		}
 		return List.copyOf(resolved);
+	}
+
+	public static boolean soundExists(String id) {
+		Identifier identifier = Identifier.tryParse(id);
+		return identifier != null && Registries.SOUND_EVENT.containsId(identifier);
 	}
 }

@@ -107,7 +107,11 @@ public final class SafePositionFinder {
 			if (pos.getY() < bottom) {
 				return false;
 			}
-			if (world.getBlockState(pos).isSolidBlock(world, pos)) {
+			BlockState support = world.getBlockState(pos);
+			if (isHazardous(support)) {
+				return false;
+			}
+			if (support.isSolidBlock(world, pos)) {
 				return true;
 			}
 		}

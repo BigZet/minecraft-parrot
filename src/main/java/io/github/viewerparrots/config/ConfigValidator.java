@@ -142,7 +142,7 @@ public final class ConfigValidator {
 		atLeast(violations, "$.behavior.idleMinTicks", behavior.idleMinTicks(), 1);
 		atLeast(violations, "$.behavior.idleMaxTicks", behavior.idleMaxTicks(), 1);
 		atLeast(violations, "$.behavior.dangerCheckTicks", behavior.dangerCheckTicks(), 1);
-		atLeast(violations, "$.behavior.dangerRadius", behavior.dangerRadius(), 1);
+		range(violations, "$.behavior.dangerRadius", behavior.dangerRadius(), 1, MAX_DISTANCE);
 		atLeast(violations, "$.behavior.lazyMinTicks", behavior.lazyMinTicks(), 1);
 		atLeast(violations, "$.behavior.lazyMaxTicks", behavior.lazyMaxTicks(), 1);
 
@@ -191,7 +191,7 @@ public final class ConfigValidator {
 	private void validateLimits(List<Violation> violations, ViewerParrotsConfig.Limits limits) {
 		atLeast(violations, "$.limits.actionsPer20Ticks", limits.actionsPer20Ticks(), 1);
 		atLeast(violations, "$.limits.soundsPer20Ticks", limits.soundsPer20Ticks(), 1);
-		range(violations, "$.limits.queueCapacity", limits.queueCapacity(), 1, 1024);
+		range(violations, "$.limits.queueCapacity", limits.queueCapacity(), 1, 256);
 	}
 
 	private void validateRecovery(List<Violation> violations, ViewerParrotsConfig.Recovery recovery) {

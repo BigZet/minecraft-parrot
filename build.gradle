@@ -21,12 +21,92 @@ loom {
 		}
 	}
 
-	// Отдельные каталоги: приёмка по разделу 15.3 требует двух клиентов и dedicated
-	// server одновременно, а общий run/ приводит к борьбе за мир и logs/latest.log.
+	// Старые серверные QA-запуски оставлены для необязательных проверок.
+	// Текущий сценарий проекта — одиночная игра стримера.
 	runs {
 		server {
 			runDir = "run/server"
 		}
+	}
+}
+
+fabricApi {
+	configureTests {
+		createSourceSet = true
+		modId = "viewerparrots-test"
+		enableGameTests = true
+		eula = true
+	}
+}
+
+loom {
+	runs {
+		gameTest {
+			runDir = "build/gametest"
+			vmArg "-Dfabric-api.gametest.report-file=${project.layout.buildDirectory.get()}/gametest-results.xml"
+		}
+		acceptanceServer {
+			inherit server
+			runDir = "build/acceptance-server"
+			programArg "nogui"
+			source sourceSets.gametest
+			vmArg "-Xmx4G"
+		}
+		acceptanceClient {
+			inherit client
+			runDir = "build/acceptance-client"
+			source sourceSets.gametest
+			vmArg "-Dviewerparrots.qa.connect=true"
+			programArgs "--username", "QAStreamer", "--quickPlayMultiplayer", "127.0.0.1:25585"
+		}
+		acceptanceObserver {
+			inherit client
+			runDir = "build/acceptance-observer"
+			source sourceSets.gametest
+			vmArg "-Dviewerparrots.qa.connect=true"
+			programArgs "--username", "QAObserver", "--quickPlayMultiplayer", "127.0.0.1:25585"
+		}
+		crashServer {
+			inherit server
+			source sourceSets.gametest
+			runDir = project.findProperty('crashRunDir') ?: 'build/process-crash/default'
+			programArg 'nogui'
+			vmArg "-Dviewerparrots.qa.crash.scenario=${project.findProperty('crashScenario') ?: 'startup'}"
+			vmArg "-Dviewerparrots.qa.crash.mode=${project.findProperty('crashMode') ?: 'verify'}"
+		}
+	}
+}
+
+tasks.withType(JavaExec).configureEach {
+	if (name in ['runAcceptanceClient', 'runAcceptanceObserver'] && project.hasProperty('acceptanceJava')) {
+		executable = project.property('acceptanceJava')
+	}
+	if (name == 'runCrashServer') {
+		doFirst {
+			def launch = layout.buildDirectory.file('process-crash-launch.args').get().asFile
+			launch.parentFile.mkdirs()
+			def quoteArg = { value -> '"' + value.toString().replace('\\', '/').replace('"', '\\"') + '"' }
+			def fixedJvmArgs = allJvmArgs.findAll { !it.startsWith('-Dviewerparrots.qa.crash') && !it.startsWith('@') }
+			launch.text = (fixedJvmArgs + ['-cp', classpath.asPath, mainClass.get()] + args).collect(quoteArg).join('\n') + '\n'
+		}
+	}
+}
+
+// Export reproducible QA launch inputs without starting a mutable live runtime.
+tasks.register('exportAcceptanceLaunch') {
+	dependsOn 'classes', 'clientClasses', 'gametestClasses', 'configureClientLaunch'
+	doLast {
+		def quoteArg = { value -> '"' + value.toString().replace('\\', '/').replace('"', '\\"') + '"' }
+		['Server', 'Client', 'Observer'].each { role ->
+			def run = tasks.named("runAcceptance${role}", JavaExec).get()
+			def file = layout.buildDirectory.file("loom-cache/argFiles/runAcceptance${role}").get().asFile
+			file.parentFile.mkdirs()
+			file.text = '-cp\n' + quoteArg(run.classpath.asPath) + '\n'
+		}
+		def crash = tasks.named('runCrashServer', JavaExec).get()
+		def crashFile = layout.buildDirectory.file('process-crash-launch.args').get().asFile
+		def fixedArgs = crash.allJvmArgs.findAll { !it.startsWith('-Dviewerparrots.qa.crash') && !it.startsWith('@') }
+		crashFile.text = (fixedArgs + ['-cp', crash.classpath.asPath, crash.mainClass.get()] + crash.args).collect(quoteArg).join('\n') + '\n'
 	}
 }
 
@@ -43,6 +123,12 @@ dependencies {
 
 test {
 	useJUnitPlatform()
+	doFirst {
+		def probeArgs = layout.buildDirectory.file('tmp/test/crash-probe-classpath.args').get().asFile
+		probeArgs.parentFile.mkdirs()
+		probeArgs.text = '-cp\n"' + sourceSets.test.runtimeClasspath.asPath.replace('\\', '/') + '"\n'
+		systemProperty 'viewerparrots.testClasspathFile', probeArgs.absolutePath
+	}
 	testLogging {
 		events "failed"
 		exceptionFormat "full"

@@ -37,11 +37,10 @@ public final class JournalCodec {
 		}
 
 		JsonView view = new JsonView(json, path);
-		view.requireKnownFields("schemaVersion", "sequence", "operationId", "phase", "viewerId",
-				"incarnationId", "generation", "record", "tombstone", CanonicalJson.CHECKSUM_FIELD);
-
 		int schemaVersion = view.requireInt("schemaVersion");
 		StorageMigrator.requireReadable(schemaVersion, path + ".schemaVersion");
+		view.requireKnownFields("schemaVersion", "sequence", "operationId", "phase", "viewerId",
+				"incarnationId", "generation", "record", "tombstone", "streamerPlayerUuid", CanonicalJson.CHECKSUM_FIELD);
 
 		String expected = view.requireString(CanonicalJson.CHECKSUM_FIELD);
 		String actual = CanonicalJson.checksum(json);
@@ -68,6 +67,7 @@ public final class JournalCodec {
 				view.has("generation") ? view.requireLong("generation") : 0L,
 				record,
 				tombstone,
+				view.optionalUuid("streamerPlayerUuid").orElse(null),
 				expected);
 	}
 
@@ -88,6 +88,7 @@ public final class JournalCodec {
 		if (entry.tombstone() != null) {
 			json.add("tombstone", SnapshotCodec.tombstoneToJson(entry.tombstone()));
 		}
+		if (entry.streamerPlayerUuid() != null) json.addProperty("streamerPlayerUuid", entry.streamerPlayerUuid().toString());
 		return json;
 	}
 }

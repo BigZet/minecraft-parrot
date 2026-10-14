@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "maxActiveParrots": 50,
+  "deathMode": "IMMORTAL",
+  "nameFormat": "{viewer_name}",
+  "nameVisible": true,
+  "permissions": {
+    "controlLevel": 2,
+    "adminLevel": 3
+  },
+  "come": {
+    "maxPathfindDistance": 64,
+    "arrivalRadius": 3,
+    "timeoutTicks": 200,
+    "teleportIfFar": true,
+    "teleportOnPathFailure": true,
+    "crossDimensionTeleport": true
+  },
+  "follow": {
+    "startDistance": 6,
+    "stopDistance": 3,
+    "repathTicks": 20
+  },
+  "dance": {
+    "durationTicks": 200
+  },
+  "cooldowns": {
+    "come": 100,
+    "follow": 20,
+    "sit": 0,
+    "dance": 200,
+    "scream": 300,
+    "respawn": 200
+  },
+  "sound": {
+    "volume": 0.8,
+    "minPitch": 1.0,
+    "maxPitch": 1.0,
+    "allowedSounds": [
+      "viewerparrots:parrot.call_01",
+      "viewerparrots:parrot.call_12",
+      "viewerparrots:parrot.call_14",
+      "viewerparrots:parrot.call_15",
+      "viewerparrots:parrot.call_27"
+    ]
+  },
+  "behavior": {
+    "enabled": true,
+    "idleMinTicks": 600,
+    "idleMaxTicks": 2400,
+    "dangerCheckTicks": 20,
+    "dangerRadius": 8,
+    "lazyMinTicks": 20,
+    "lazyMaxTicks": 100,
+    "normalSoundChance": 0.1,
+    "loudSoundChance": 0.5,
+    "traitWeights": {
+      "NORMAL": 40,
+      "COWARD": 20,
+      "HERO": 0,
+      "LAZY": 20,
+      "LOUD": 20,
+      "THIEF": 0
+    }
+  },
+  "limits": {
+    "actionsPer20Ticks": 20,
+    "soundsPer20Ticks": 4,
+    "queueCapacity": 256
+  },
+  "recovery": {
+    "maxConcurrentJobs": 2,
+    "timeoutTicks": 100
+  },
+  "storage": {
+    "checkpointIntervalTicks": 600,
+    "shutdownTimeoutSeconds": 10
+  }
+}

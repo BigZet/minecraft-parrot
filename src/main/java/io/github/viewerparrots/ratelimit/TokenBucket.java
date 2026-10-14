@@ -11,8 +11,8 @@ package io.github.viewerparrots.ratelimit;
  * до нуля на каждом отдельном тике.
  */
 public final class TokenBucket {
-	private final double capacity;
-	private final double refillPerTick;
+	private double capacity;
+	private double refillPerTick;
 
 	private double tokens;
 	private long lastTick;
@@ -61,6 +61,17 @@ public final class TokenBucket {
 	public double availableTokens(long currentTick) {
 		refill(currentTick);
 		return this.tokens;
+	}
+
+	/** Change future refill rates without granting fresh tokens on reload. */
+	public void reconfigure(int capacity, int refillPerWindow, int windowTicks, long currentTick) {
+		if (capacity <= 0 || refillPerWindow <= 0 || windowTicks <= 0) {
+			throw new IllegalArgumentException("bucket settings must be positive");
+		}
+		refill(currentTick);
+		this.capacity = capacity;
+		this.refillPerTick = (double) refillPerWindow / windowTicks;
+		this.tokens = Math.min(this.tokens, this.capacity);
 	}
 
 	private void refill(long currentTick) {

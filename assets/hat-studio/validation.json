@@ -1,0 +1,71 @@
+{
+  "valid": true,
+  "hatCount": 8,
+  "checks": [
+    "cuboid bounds",
+    "Java offset",
+    "UV palette",
+    "embedded PNG",
+    "PNG CRC/RGBA",
+    "GLB v2 headers",
+    "GLB buffer bounds"
+  ],
+  "hats": [
+    {
+      "id": "royal_crown",
+      "cuboids": 20,
+      "heightPixels": 3.25,
+      "pngBytes": 100,
+      "glbBytes": 29200
+    },
+    {
+      "id": "top_hat",
+      "cuboids": 12,
+      "heightPixels": 4.5,
+      "pngBytes": 99,
+      "glbBytes": 17848
+    },
+    {
+      "id": "pirate_hat",
+      "cuboids": 24,
+      "heightPixels": 3.15,
+      "pngBytes": 99,
+      "glbBytes": 34472
+    },
+    {
+      "id": "mushroom_hat",
+      "cuboids": 17,
+      "heightPixels": 3.73,
+      "pngBytes": 96,
+      "glbBytes": 24616
+    },
+    {
+      "id": "wizard_hat",
+      "cuboids": 18,
+      "heightPixels": 5.95,
+      "pngBytes": 100,
+      "glbBytes": 26192
+    },
+    {
+      "id": "propeller_cap",
+      "cuboids": 18,
+      "heightPixels": 3.6,
+      "pngBytes": 104,
+      "glbBytes": 26348
+    },
+    {
+      "id": "cowboy_hat",
+      "cuboids": 20,
+      "heightPixels": 3.05,
+      "pngBytes": 109,
+      "glbBytes": 29232
+    },
+    {
+      "id": "ufo_hat",
+      "cuboids": 18,
+      "heightPixels": 4.05,
+      "pngBytes": 113,
+      "glbBytes": 26764
+    }
+  ]
+}

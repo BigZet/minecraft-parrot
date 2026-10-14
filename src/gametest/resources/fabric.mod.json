@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "viewerparrots-test",
+  "version": "1.0.0",
+  "name": "Viewer Parrots acceptance tests",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["io.github.viewerparrots.gametest.AcceptanceHarness", "io.github.viewerparrots.gametest.CrashAcceptanceHarness", "io.github.viewerparrots.gametest.RegistryBootAcceptance", "io.github.viewerparrots.gametest.DiskLifecycleAcceptance"],
+    "client": ["io.github.viewerparrots.gametest.AcceptanceClient"],
+    "fabric-gametest": [
+      "io.github.viewerparrots.gametest.ViewerParrotsGameTests",
+      "io.github.viewerparrots.gametest.StorageGameTests",
+      "io.github.viewerparrots.gametest.ContractsGameTests",
+      "io.github.viewerparrots.gametest.PersonalityGameTests",
+      "io.github.viewerparrots.gametest.SafePositionGameTests",
+      "io.github.viewerparrots.gametest.PreparedCommitGameTests",
+      "io.github.viewerparrots.gametest.RecoveryTicketGameTests",
+      "io.github.viewerparrots.gametest.AcceptanceScenarioGameTests",
+      "io.github.viewerparrots.gametest.BootstrapIoGameTests",
+      "io.github.viewerparrots.gametest.DiagnosticsGameTests",
+      "io.github.viewerparrots.gametest.CommandAdapterGameTests"
+    ]
+  },
+  "mixins": [
+    {"config": "viewerparrots-test.client.mixins.json", "environment": "client"},
+    "viewerparrots-test.crash.mixins.json",
+    "viewerparrots-test.registry-load.mixins.json",
+    "viewerparrots-test.bootstrap.mixins.json"
+  ],
+  "depends": {"viewerparrots": "*", "fabric-gametest-api-v1": "*"}
+}

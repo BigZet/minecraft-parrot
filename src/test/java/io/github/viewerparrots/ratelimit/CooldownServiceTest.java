@@ -56,6 +56,19 @@ class CooldownServiceTest {
 	}
 
 	@Test
+	@DisplayName("exp разрешён раз в 30 секунд отдельно на зрителя")
+	void experienceBottleWaitsThirtySecondsWithoutBlockingOtherViewers() {
+		this.cooldowns.consume(VIEWER, ParrotAction.EXP, ParrotAction.EXP_COOLDOWN_TICKS);
+		assertFalse(this.cooldowns.isOnCooldown(OTHER, ParrotAction.EXP));
+		assertFalse(this.cooldowns.isOnCooldown(VIEWER, ParrotAction.LOVE));
+		this.clock.advanceTicks(599);
+		assertTrue(this.cooldowns.isOnCooldown(VIEWER, ParrotAction.EXP));
+		assertEquals(1L, this.cooldowns.remainingTicks(VIEWER, ParrotAction.EXP));
+		this.clock.advanceTicks(1);
+		assertFalse(this.cooldowns.isOnCooldown(VIEWER, ParrotAction.EXP));
+	}
+
+	@Test
 	@DisplayName("нулевой cooldown ничего не запрещает: повторный sit — успешный no-op")
 	void zeroCooldownNeverBlocks() {
 		this.cooldowns.consume(VIEWER, ParrotAction.SIT, 0L);

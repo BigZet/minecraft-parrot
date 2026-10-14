@@ -31,11 +31,11 @@ class ParrotRuntimeTest {
 	}
 
 	@Test
-	@DisplayName("новый runtime начинает с IDLE")
-	void startsIdle() {
+	@DisplayName("новый runtime начинает со свободного поведения")
+	void startsFree() {
 		assertAll(
-				() -> assertEquals(BehaviorState.IDLE, this.runtime.behavior()),
-				() -> assertEquals(DesiredBehavior.IDLE, this.runtime.desiredBehavior()));
+				() -> assertEquals(BehaviorState.FREE, this.runtime.behavior()),
+				() -> assertEquals(DesiredBehavior.FREE, this.runtime.desiredBehavior()));
 	}
 
 	@Test
@@ -48,6 +48,16 @@ class ParrotRuntimeTest {
 				() -> assertFalse(this.runtime.isDanceExpired(99)),
 				() -> assertTrue(this.runtime.isDanceExpired(100)),
 				() -> assertTrue(this.runtime.isDanceExpired(101)));
+	}
+
+	@Test
+	void danceTracksCompletionUntilCancelledBySit() {
+		UUID command = new UUID(0, 4);
+		applyEvent(BehaviorStateMachine.Event.COMMAND_DANCE, 0);
+		this.runtime.startDance(command, 100);
+		assertEquals(command, this.runtime.danceCommandId().orElseThrow());
+		applyEvent(BehaviorStateMachine.Event.COMMAND_SIT, 20);
+		assertTrue(this.runtime.danceCommandId().isEmpty());
 	}
 
 	@Test
@@ -106,6 +116,8 @@ class ParrotRuntimeTest {
 		applyEvent(BehaviorStateMachine.Event.COMMAND_DANCE, 0);
 		this.runtime.startDance(100);
 		this.runtime.startMovement(200);
+		this.runtime.setTargetPlayerUuid(UUID.randomUUID());
+		this.runtime.markRepathed(0, 200);
 
 		this.runtime.restoreDesired(DesiredBehavior.FOLLOWING);
 
@@ -113,7 +125,9 @@ class ParrotRuntimeTest {
 				() -> assertEquals(BehaviorState.FOLLOWING, this.runtime.behavior()),
 				() -> assertEquals(DesiredBehavior.FOLLOWING, this.runtime.desiredBehavior()),
 				() -> assertEquals(0L, this.runtime.movementDeadlineTick()),
-				() -> assertTrue(this.runtime.pendingAction().isEmpty()));
+				() -> assertTrue(this.runtime.pendingAction().isEmpty()),
+				() -> assertTrue(this.runtime.targetPlayerUuid().isEmpty()),
+				() -> assertTrue(this.runtime.canRepath(0)));
 	}
 
 	@Test

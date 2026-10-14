@@ -20,6 +20,7 @@ public record JournalEntryDto(
 		long generation,
 		SnapshotDto.ParrotRecordDto record,
 		SnapshotDto.TombstoneDto tombstone,
+		UUID streamerPlayerUuid,
 		String checksum
 ) {
 	public static final int CURRENT_SCHEMA_VERSION = 1;
@@ -43,6 +44,13 @@ public record JournalEntryDto(
 		}
 	}
 
+	public JournalEntryDto(int schemaVersion, long sequence, UUID operationId, Phase phase,
+			String viewerId, UUID incarnationId, long generation, SnapshotDto.ParrotRecordDto record,
+			SnapshotDto.TombstoneDto tombstone, String checksum) {
+		this(schemaVersion, sequence, operationId, phase, viewerId, incarnationId, generation,
+				record, tombstone, null, checksum);
+	}
+
 	public Optional<SnapshotDto.ParrotRecordDto> recordPayload() {
 		return Optional.ofNullable(this.record);
 	}
@@ -53,6 +61,6 @@ public record JournalEntryDto(
 
 	public JournalEntryDto withChecksum(String newChecksum) {
 		return new JournalEntryDto(this.schemaVersion, this.sequence, this.operationId, this.phase,
-				this.viewerId, this.incarnationId, this.generation, this.record, this.tombstone, newChecksum);
+				this.viewerId, this.incarnationId, this.generation, this.record, this.tombstone, this.streamerPlayerUuid, newChecksum);
 	}
 }

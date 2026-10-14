@@ -1,0 +1,7 @@
+{
+  "required": true,
+  "package": "io.github.viewerparrots.gametest.client",
+  "compatibilityLevel": "JAVA_21",
+  "client": ["SoundPacketAuditMixin", "SoundPlaybackAuditMixin"],
+  "injectors": {"defaultRequire": 1}
+}

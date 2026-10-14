@@ -1,0 +1,2167 @@
+{
+  "title": "Шляпы для попугаев",
+  "hats": [
+    {
+      "id": "royal_crown",
+      "name": "Корона солнечного короля",
+      "description": "Золотой венец с десятью зубцами и тремя цветными камнями.",
+      "cubes": [
+        {
+          "name": "gold_base",
+          "from": [
+            -1.45,
+            0,
+            -2.25
+          ],
+          "to": [
+            1.45,
+            0.35,
+            2.25
+          ],
+          "color": "#C88B2D"
+        },
+        {
+          "name": "front_band",
+          "from": [
+            -1.45,
+            0.35,
+            -2.25
+          ],
+          "to": [
+            1.45,
+            1.35,
+            -2.0
+          ],
+          "color": "#EFC04F"
+        },
+        {
+          "name": "back_band",
+          "from": [
+            -1.45,
+            0.35,
+            2.0
+          ],
+          "to": [
+            1.45,
+            1.35,
+            2.25
+          ],
+          "color": "#EFC04F"
+        },
+        {
+          "name": "left_band",
+          "from": [
+            -1.45,
+            0.35,
+            -2.0
+          ],
+          "to": [
+            -1.15,
+            1.35,
+            2.0
+          ],
+          "color": "#EFC04F"
+        },
+        {
+          "name": "right_band",
+          "from": [
+            1.15,
+            0.35,
+            -2.0
+          ],
+          "to": [
+            1.45,
+            1.35,
+            2.0
+          ],
+          "color": "#EFC04F"
+        },
+        {
+          "name": "front_point_1",
+          "from": [
+            -1.3,
+            1.35,
+            -2.25
+          ],
+          "to": [
+            -0.7000000000000001,
+            2.15,
+            -2.0
+          ],
+          "color": "#FFE28A"
+        },
+        {
+          "name": "front_point_2",
+          "from": [
+            -0.35,
+            1.35,
+            -2.25
+          ],
+          "to": [
+            0.25,
+            2.6,
+            -2.0
+          ],
+          "color": "#FFE28A"
+        },
+        {
+          "name": "front_point_3",
+          "from": [
+            0.75,
+            1.35,
+            -2.25
+          ],
+          "to": [
+            1.35,
+            2.15,
+            -2.0
+          ],
+          "color": "#FFE28A"
+        },
+        {
+          "name": "back_point_1",
+          "from": [
+            -1.3,
+            1.35,
+            2.0
+          ],
+          "to": [
+            -0.7000000000000001,
+            2.15,
+            2.25
+          ],
+          "color": "#FFE28A"
+        },
+        {
+          "name": "back_point_2",
+          "from": [
+            -0.35,
+            1.35,
+            2.0
+          ],
+          "to": [
+            0.25,
+            2.6,
+            2.25
+          ],
+          "color": "#FFE28A"
+        },
+        {
+          "name": "back_point_3",
+          "from": [
+            0.75,
+            1.35,
+            2.0
+          ],
+          "to": [
+            1.35,
+            2.15,
+            2.25
+          ],
+          "color": "#FFE28A"
+        },
+        {
+          "name": "left_point_1",
+          "from": [
+            -1.45,
+            1.35,
+            -1.15
+          ],
+          "to": [
+            -1.15,
+            2.15,
+            -0.5999999999999999
+          ],
+          "color": "#FFE28A"
+        },
+        {
+          "name": "left_point_2",
+          "from": [
+            -1.45,
+            1.35,
+            0.65
+          ],
+          "to": [
+            -1.15,
+            2.15,
+            1.2000000000000002
+          ],
+          "color": "#FFE28A"
+        },
+        {
+          "name": "right_point_1",
+          "from": [
+            1.15,
+            1.35,
+            -1.15
+          ],
+          "to": [
+            1.45,
+            2.15,
+            -0.5999999999999999
+          ],
+          "color": "#FFE28A"
+        },
+        {
+          "name": "right_point_2",
+          "from": [
+            1.15,
+            1.35,
+            0.65
+          ],
+          "to": [
+            1.45,
+            2.15,
+            1.2000000000000002
+          ],
+          "color": "#FFE28A"
+        },
+        {
+          "name": "blue_front_jewel",
+          "from": [
+            -0.35,
+            0.55,
+            -2.4
+          ],
+          "to": [
+            0.35,
+            1.1,
+            -2.24
+          ],
+          "color": "#56BEE8"
+        },
+        {
+          "name": "ruby_left_jewel",
+          "from": [
+            -1.6,
+            0.55,
+            -0.35
+          ],
+          "to": [
+            -1.44,
+            1.05,
+            0.35
+          ],
+          "color": "#EB5B77"
+        },
+        {
+          "name": "jade_right_jewel",
+          "from": [
+            1.44,
+            0.55,
+            -0.35
+          ],
+          "to": [
+            1.6,
+            1.05,
+            0.35
+          ],
+          "color": "#60D3AD"
+        },
+        {
+          "name": "front_peak",
+          "from": [
+            -0.17,
+            2.6,
+            -2.25
+          ],
+          "to": [
+            0.07,
+            2.95,
+            -2.0
+          ],
+          "color": "#EFC04F"
+        },
+        {
+          "name": "front_peak_sapphire",
+          "from": [
+            -0.23,
+            2.95,
+            -2.3
+          ],
+          "to": [
+            0.13,
+            3.25,
+            -1.95
+          ],
+          "color": "#56BEE8"
+        }
+      ],
+      "files": {
+        "bbmodel": "bbmodel/royal_crown.bbmodel",
+        "minecraft": "models/item/royal_crown.json",
+        "texture": "textures/item/royal_crown.png",
+        "glb": "glb/royal_crown.glb"
+      }
+    },
+    {
+      "id": "top_hat",
+      "name": "Полуночный цилиндр",
+      "description": "Высокий шелковый цилиндр с ягодной лентой и золотой пряжкой.",
+      "cubes": [
+        {
+          "name": "brim_center",
+          "from": [
+            -2.5,
+            0,
+            -2.6
+          ],
+          "to": [
+            2.5,
+            0.3,
+            2.6
+          ],
+          "color": "#22293B"
+        },
+        {
+          "name": "brim_front",
+          "from": [
+            -1.8,
+            0,
+            -3
+          ],
+          "to": [
+            1.8,
+            0.3,
+            -2.6
+          ],
+          "color": "#22293B"
+        },
+        {
+          "name": "brim_back",
+          "from": [
+            -1.8,
+            0,
+            2.6
+          ],
+          "to": [
+            1.8,
+            0.3,
+            3
+          ],
+          "color": "#22293B"
+        },
+        {
+          "name": "lower_crown",
+          "from": [
+            -1.65,
+            0.3,
+            -2.3
+          ],
+          "to": [
+            1.65,
+            0.75,
+            2.3
+          ],
+          "color": "#303A52"
+        },
+        {
+          "name": "velvet_ribbon",
+          "from": [
+            -1.68,
+            0.75,
+            -2.33
+          ],
+          "to": [
+            1.68,
+            1.35,
+            2.33
+          ],
+          "color": "#A94761"
+        },
+        {
+          "name": "tall_crown",
+          "from": [
+            -1.6,
+            1.35,
+            -2.25
+          ],
+          "to": [
+            1.6,
+            4.2,
+            2.25
+          ],
+          "color": "#303A52"
+        },
+        {
+          "name": "polished_top",
+          "from": [
+            -1.7,
+            4.2,
+            -2.35
+          ],
+          "to": [
+            1.7,
+            4.5,
+            2.35
+          ],
+          "color": "#45536C"
+        },
+        {
+          "name": "silk_glint",
+          "from": [
+            -1.35,
+            1.6,
+            -2.28
+          ],
+          "to": [
+            -1.15,
+            3.85,
+            -2.24
+          ],
+          "color": "#45536C"
+        },
+        {
+          "name": "buckle_left",
+          "from": [
+            -0.5,
+            0.85,
+            -2.43
+          ],
+          "to": [
+            -0.35,
+            1.25,
+            -2.32
+          ],
+          "color": "#EFC04F"
+        },
+        {
+          "name": "buckle_right",
+          "from": [
+            0.35,
+            0.85,
+            -2.43
+          ],
+          "to": [
+            0.5,
+            1.25,
+            -2.32
+          ],
+          "color": "#EFC04F"
+        },
+        {
+          "name": "buckle_top",
+          "from": [
+            -0.35,
+            1.1,
+            -2.43
+          ],
+          "to": [
+            0.35,
+            1.25,
+            -2.32
+          ],
+          "color": "#FFE28A"
+        },
+        {
+          "name": "buckle_bottom",
+          "from": [
+            -0.35,
+            0.85,
+            -2.43
+          ],
+          "to": [
+            0.35,
+            1.0,
+            -2.32
+          ],
+          "color": "#EFC04F"
+        }
+      ],
+      "files": {
+        "bbmodel": "bbmodel/top_hat.bbmodel",
+        "minecraft": "models/item/top_hat.json",
+        "texture": "textures/item/top_hat.png",
+        "glb": "glb/top_hat.glb"
+      }
+    },
+    {
+      "id": "pirate_hat",
+      "name": "Капитан Клюв",
+      "description": "Треуголка с высоким передним отворотом, пиксельным черепом и алым бантом.",
+      "cubes": [
+        {
+          "name": "head_platform",
+          "from": [
+            -1.2,
+            0,
+            -2.15
+          ],
+          "to": [
+            1.2,
+            0.35,
+            2.15
+          ],
+          "color": "#222B36"
+        },
+        {
+          "name": "crown",
+          "from": [
+            -1.45,
+            0.35,
+            -2.15
+          ],
+          "to": [
+            1.45,
+            1.95,
+            2.15
+          ],
+          "color": "#374352"
+        },
+        {
+          "name": "wide_front_fold",
+          "from": [
+            -2.7,
+            0.25,
+            -2.75
+          ],
+          "to": [
+            2.7,
+            1.3,
+            -2.35
+          ],
+          "color": "#222B36"
+        },
+        {
+          "name": "front_peak",
+          "from": [
+            -1.7,
+            1.3,
+            -2.75
+          ],
+          "to": [
+            1.7,
+            2.4,
+            -2.35
+          ],
+          "color": "#374352"
+        },
+        {
+          "name": "front_peak_step",
+          "from": [
+            -0.85,
+            2.4,
+            -2.75
+          ],
+          "to": [
+            0.85,
+            3.0,
+            -2.35
+          ],
+          "color": "#374352"
+        },
+        {
+          "name": "peak_gold_trim",
+          "from": [
+            -0.85,
+            3.0,
+            -2.79
+          ],
+          "to": [
+            0.85,
+            3.15,
+            -2.74
+          ],
+          "color": "#EFC04F"
+        },
+        {
+          "name": "left_tip",
+          "from": [
+            -3.0,
+            0.35,
+            -2.25
+          ],
+          "to": [
+            -2.0,
+            1.5,
+            -1.5
+          ],
+          "color": "#222B36"
+        },
+        {
+          "name": "right_tip",
+          "from": [
+            2.0,
+            0.35,
+            -2.25
+          ],
+          "to": [
+            3.0,
+            1.5,
+            -1.5
+          ],
+          "color": "#222B36"
+        },
+        {
+          "name": "left_fold",
+          "from": [
+            -2.1,
+            0.25,
+            -1.5
+          ],
+          "to": [
+            -1.6,
+            1.25,
+            2.1
+          ],
+          "color": "#222B36"
+        },
+        {
+          "name": "right_fold",
+          "from": [
+            1.6,
+            0.25,
+            -1.5
+          ],
+          "to": [
+            2.1,
+            1.25,
+            2.1
+          ],
+          "color": "#222B36"
+        },
+        {
+          "name": "rear_triangle",
+          "from": [
+            -1.25,
+            0.2,
+            2.1
+          ],
+          "to": [
+            1.25,
+            1.4,
+            2.8
+          ],
+          "color": "#222B36"
+        },
+        {
+          "name": "front_gold_trim",
+          "from": [
+            -1.7,
+            2.25,
+            -2.79
+          ],
+          "to": [
+            1.7,
+            2.4,
+            -2.74
+          ],
+          "color": "#EFC04F"
+        },
+        {
+          "name": "skull",
+          "from": [
+            -0.52,
+            1.35,
+            -2.87
+          ],
+          "to": [
+            0.52,
+            2.05,
+            -2.76
+          ],
+          "color": "#F4E5C6"
+        },
+        {
+          "name": "skull_chin",
+          "from": [
+            -0.3,
+            1.15,
+            -2.87
+          ],
+          "to": [
+            0.3,
+            1.4,
+            -2.76
+          ],
+          "color": "#F4E5C6"
+        },
+        {
+          "name": "left_eye",
+          "from": [
+            -0.38,
+            1.65,
+            -2.92
+          ],
+          "to": [
+            -0.12,
+            1.87,
+            -2.86
+          ],
+          "color": "#222B36"
+        },
+        {
+          "name": "right_eye",
+          "from": [
+            0.12,
+            1.65,
+            -2.92
+          ],
+          "to": [
+            0.38,
+            1.87,
+            -2.86
+          ],
+          "color": "#222B36"
+        },
+        {
+          "name": "nose",
+          "from": [
+            -0.09,
+            1.4,
+            -2.93
+          ],
+          "to": [
+            0.09,
+            1.56,
+            -2.86
+          ],
+          "color": "#222B36"
+        },
+        {
+          "name": "left_bone_high",
+          "from": [
+            -1.02,
+            1.4,
+            -2.86
+          ],
+          "to": [
+            -0.65,
+            1.6,
+            -2.76
+          ],
+          "color": "#F4E5C6"
+        },
+        {
+          "name": "left_bone_low",
+          "from": [
+            -0.9,
+            0.95,
+            -2.86
+          ],
+          "to": [
+            -0.52,
+            1.15,
+            -2.76
+          ],
+          "color": "#F4E5C6"
+        },
+        {
+          "name": "right_bone_high",
+          "from": [
+            0.65,
+            1.4,
+            -2.86
+          ],
+          "to": [
+            1.02,
+            1.6,
+            -2.76
+          ],
+          "color": "#F4E5C6"
+        },
+        {
+          "name": "right_bone_low",
+          "from": [
+            0.52,
+            0.95,
+            -2.86
+          ],
+          "to": [
+            0.9,
+            1.15,
+            -2.76
+          ],
+          "color": "#F4E5C6"
+        },
+        {
+          "name": "red_knot",
+          "from": [
+            1.65,
+            0.8,
+            1.45
+          ],
+          "to": [
+            2.25,
+            1.35,
+            2.05
+          ],
+          "color": "#D75B67"
+        },
+        {
+          "name": "red_tail_long",
+          "from": [
+            1.65,
+            0.1,
+            1.75
+          ],
+          "to": [
+            2.05,
+            0.9,
+            2.1
+          ],
+          "color": "#A43C55"
+        },
+        {
+          "name": "red_tail_short",
+          "from": [
+            2.05,
+            0.35,
+            1.75
+          ],
+          "to": [
+            2.45,
+            0.95,
+            2.1
+          ],
+          "color": "#D75B67"
+        }
+      ],
+      "files": {
+        "bbmodel": "bbmodel/pirate_hat.bbmodel",
+        "minecraft": "models/item/pirate_hat.json",
+        "texture": "textures/item/pirate_hat.png",
+        "glb": "glb/pirate_hat.glb"
+      }
+    },
+    {
+      "id": "mushroom_hat",
+      "name": "Лесной мухомор",
+      "description": "Кремовая подкладка, ступенчатая красная шляпка и объемные светлые пятна.",
+      "cubes": [
+        {
+          "name": "soft_stem_cap",
+          "from": [
+            -1.2,
+            0,
+            -2.15
+          ],
+          "to": [
+            1.2,
+            1.25,
+            2.15
+          ],
+          "color": "#F0DDAC"
+        },
+        {
+          "name": "underside",
+          "from": [
+            -2.4,
+            1.15,
+            -2.8
+          ],
+          "to": [
+            2.4,
+            1.4,
+            2.8
+          ],
+          "color": "#CAB580"
+        },
+        {
+          "name": "red_rim",
+          "from": [
+            -2.65,
+            1.4,
+            -3.1
+          ],
+          "to": [
+            2.65,
+            1.95,
+            3.1
+          ],
+          "color": "#C54450"
+        },
+        {
+          "name": "dome_lower",
+          "from": [
+            -2.2,
+            1.95,
+            -2.75
+          ],
+          "to": [
+            2.2,
+            2.65,
+            2.75
+          ],
+          "color": "#E7645A"
+        },
+        {
+          "name": "dome_upper",
+          "from": [
+            -1.65,
+            2.65,
+            -2.1
+          ],
+          "to": [
+            1.65,
+            3.25,
+            2.1
+          ],
+          "color": "#C54450"
+        },
+        {
+          "name": "dome_top",
+          "from": [
+            -1.05,
+            3.25,
+            -1.4
+          ],
+          "to": [
+            1.05,
+            3.65,
+            1.4
+          ],
+          "color": "#E7645A"
+        },
+        {
+          "name": "front_spot_left",
+          "from": [
+            -1.75,
+            2.05,
+            -2.82
+          ],
+          "to": [
+            -0.95,
+            2.5,
+            -2.74
+          ],
+          "color": "#FFF1D5"
+        },
+        {
+          "name": "front_spot_right",
+          "from": [
+            0.65,
+            2.1,
+            -2.82
+          ],
+          "to": [
+            1.25,
+            2.58,
+            -2.74
+          ],
+          "color": "#FFF1D5"
+        },
+        {
+          "name": "front_rim_spot",
+          "from": [
+            -0.3,
+            1.55,
+            -3.18
+          ],
+          "to": [
+            0.45,
+            1.85,
+            -3.09
+          ],
+          "color": "#F0DDAC"
+        },
+        {
+          "name": "right_spot",
+          "from": [
+            2.19,
+            2.05,
+            -0.65
+          ],
+          "to": [
+            2.29,
+            2.5,
+            0.2
+          ],
+          "color": "#FFF1D5"
+        },
+        {
+          "name": "left_spot",
+          "from": [
+            -2.29,
+            2.05,
+            0.65
+          ],
+          "to": [
+            -2.19,
+            2.5,
+            1.55
+          ],
+          "color": "#FFF1D5"
+        },
+        {
+          "name": "rear_spot",
+          "from": [
+            -0.4,
+            2.0,
+            2.74
+          ],
+          "to": [
+            0.45,
+            2.5,
+            2.85
+          ],
+          "color": "#F0DDAC"
+        },
+        {
+          "name": "top_spot_left",
+          "from": [
+            -1.3,
+            3.26,
+            -0.9
+          ],
+          "to": [
+            -0.75,
+            3.33,
+            -0.25
+          ],
+          "color": "#FFF1D5"
+        },
+        {
+          "name": "top_spot_center",
+          "from": [
+            -0.25,
+            3.65,
+            0.15
+          ],
+          "to": [
+            0.5,
+            3.73,
+            0.85
+          ],
+          "color": "#FFF1D5"
+        },
+        {
+          "name": "upper_spot",
+          "from": [
+            0.5,
+            2.85,
+            -2.18
+          ],
+          "to": [
+            1.1,
+            3.15,
+            -2.09
+          ],
+          "color": "#FFF1D5"
+        },
+        {
+          "name": "left_gill",
+          "from": [
+            -2.2,
+            1.08,
+            -0.95
+          ],
+          "to": [
+            -1.22,
+            1.16,
+            -0.65
+          ],
+          "color": "#F0DDAC"
+        },
+        {
+          "name": "right_gill",
+          "from": [
+            1.22,
+            1.08,
+            0.6
+          ],
+          "to": [
+            2.2,
+            1.16,
+            0.9
+          ],
+          "color": "#F0DDAC"
+        }
+      ],
+      "files": {
+        "bbmodel": "bbmodel/mushroom_hat.bbmodel",
+        "minecraft": "models/item/mushroom_hat.json",
+        "texture": "textures/item/mushroom_hat.png",
+        "glb": "glb/mushroom_hat.glb"
+      }
+    },
+    {
+      "id": "wizard_hat",
+      "name": "Звездочет",
+      "description": "Высокий слегка загнутый колпак с золотыми звездами и бирюзовой луной.",
+      "cubes": [
+        {
+          "name": "brim_center",
+          "from": [
+            -2.65,
+            0,
+            -2.6
+          ],
+          "to": [
+            2.65,
+            0.3,
+            2.6
+          ],
+          "color": "#34395E"
+        },
+        {
+          "name": "brim_front",
+          "from": [
+            -1.9,
+            0,
+            -3.1
+          ],
+          "to": [
+            1.9,
+            0.3,
+            -2.6
+          ],
+          "color": "#34395E"
+        },
+        {
+          "name": "brim_back",
+          "from": [
+            -1.9,
+            0,
+            2.6
+          ],
+          "to": [
+            1.9,
+            0.3,
+            3.1
+          ],
+          "color": "#34395E"
+        },
+        {
+          "name": "gold_hatband",
+          "from": [
+            -1.55,
+            0.3,
+            -2.25
+          ],
+          "to": [
+            1.55,
+            0.75,
+            2.25
+          ],
+          "color": "#EFC04F"
+        },
+        {
+          "name": "cone_base",
+          "from": [
+            -1.45,
+            0.75,
+            -2.15
+          ],
+          "to": [
+            1.45,
+            1.7,
+            2.15
+          ],
+          "color": "#565385"
+        },
+        {
+          "name": "cone_step_two",
+          "from": [
+            -1.2,
+            1.7,
+            -1.8
+          ],
+          "to": [
+            1.2,
+            2.7,
+            1.8
+          ],
+          "color": "#34395E"
+        },
+        {
+          "name": "cone_step_three",
+          "from": [
+            -0.8,
+            2.7,
+            -1.35
+          ],
+          "to": [
+            1.0,
+            3.65,
+            1.35
+          ],
+          "color": "#565385"
+        },
+        {
+          "name": "cone_step_four",
+          "from": [
+            -0.45,
+            3.65,
+            -0.9
+          ],
+          "to": [
+            0.9,
+            4.5,
+            0.9
+          ],
+          "color": "#7773A7"
+        },
+        {
+          "name": "bent_tip_base",
+          "from": [
+            0.05,
+            4.5,
+            -0.55
+          ],
+          "to": [
+            0.9,
+            5.2,
+            0.55
+          ],
+          "color": "#565385"
+        },
+        {
+          "name": "bent_tip",
+          "from": [
+            0.5,
+            5.2,
+            -0.35
+          ],
+          "to": [
+            1.25,
+            5.7,
+            0.35
+          ],
+          "color": "#7773A7"
+        },
+        {
+          "name": "tip_gold_bead",
+          "from": [
+            1.0,
+            5.55,
+            -0.25
+          ],
+          "to": [
+            1.4,
+            5.95,
+            0.25
+          ],
+          "color": "#FFE28A"
+        },
+        {
+          "name": "star_one_vertical",
+          "from": [
+            -0.85,
+            1.0,
+            -2.25
+          ],
+          "to": [
+            -0.6,
+            1.55,
+            -2.14
+          ],
+          "color": "#FFE28A"
+        },
+        {
+          "name": "star_one_horizontal",
+          "from": [
+            -1.0,
+            1.17,
+            -2.26
+          ],
+          "to": [
+            -0.45,
+            1.4,
+            -2.14
+          ],
+          "color": "#FFE28A"
+        },
+        {
+          "name": "star_two_vertical",
+          "from": [
+            0.5,
+            1.95,
+            -1.9
+          ],
+          "to": [
+            0.7,
+            2.5,
+            -1.79
+          ],
+          "color": "#EFC04F"
+        },
+        {
+          "name": "star_two_horizontal",
+          "from": [
+            0.3,
+            2.12,
+            -1.91
+          ],
+          "to": [
+            0.9,
+            2.33,
+            -1.79
+          ],
+          "color": "#EFC04F"
+        },
+        {
+          "name": "moon_left",
+          "from": [
+            -0.65,
+            2.95,
+            -1.45
+          ],
+          "to": [
+            -0.43,
+            3.45,
+            -1.34
+          ],
+          "color": "#91DAD3"
+        },
+        {
+          "name": "moon_top",
+          "from": [
+            -0.45,
+            3.4,
+            -1.45
+          ],
+          "to": [
+            0.05,
+            3.58,
+            -1.34
+          ],
+          "color": "#91DAD3"
+        },
+        {
+          "name": "moon_bottom",
+          "from": [
+            -0.45,
+            2.8,
+            -1.45
+          ],
+          "to": [
+            0.05,
+            3.0,
+            -1.34
+          ],
+          "color": "#91DAD3"
+        }
+      ],
+      "files": {
+        "bbmodel": "bbmodel/wizard_hat.bbmodel",
+        "minecraft": "models/item/wizard_hat.json",
+        "texture": "textures/item/wizard_hat.png",
+        "glb": "glb/wizard_hat.glb"
+      }
+    },
+    {
+      "id": "propeller_cap",
+      "name": "Винт-пилот",
+      "description": "Четырехцветная кепка с длинным козырьком и ярким четырехлопастным пропеллером.",
+      "cubes": [
+        {
+          "name": "cap_platform",
+          "from": [
+            -1.2,
+            0,
+            -2.15
+          ],
+          "to": [
+            1.2,
+            0.3,
+            2.15
+          ],
+          "color": "#3D597D"
+        },
+        {
+          "name": "panel_front_left",
+          "from": [
+            -1.4,
+            0.3,
+            -2.15
+          ],
+          "to": [
+            0,
+            1.5,
+            0
+          ],
+          "color": "#E16D72"
+        },
+        {
+          "name": "dome_front_left",
+          "from": [
+            -1.0919999999999999,
+            1.5,
+            -1.677
+          ],
+          "to": [
+            0.0,
+            2.15,
+            0.0
+          ],
+          "color": "#E16D72"
+        },
+        {
+          "name": "panel_front_right",
+          "from": [
+            0,
+            0.3,
+            -2.15
+          ],
+          "to": [
+            1.4,
+            1.5,
+            0
+          ],
+          "color": "#568FC6"
+        },
+        {
+          "name": "dome_front_right",
+          "from": [
+            0.0,
+            1.5,
+            -1.677
+          ],
+          "to": [
+            1.0919999999999999,
+            2.15,
+            0.0
+          ],
+          "color": "#568FC6"
+        },
+        {
+          "name": "panel_back_left",
+          "from": [
+            -1.4,
+            0.3,
+            0
+          ],
+          "to": [
+            0,
+            1.5,
+            2.15
+          ],
+          "color": "#F5CF6B"
+        },
+        {
+          "name": "dome_back_left",
+          "from": [
+            -1.0919999999999999,
+            1.5,
+            0.0
+          ],
+          "to": [
+            0.0,
+            2.15,
+            1.677
+          ],
+          "color": "#F5CF6B"
+        },
+        {
+          "name": "panel_back_right",
+          "from": [
+            0,
+            0.3,
+            0
+          ],
+          "to": [
+            1.4,
+            1.5,
+            2.15
+          ],
+          "color": "#74C7AD"
+        },
+        {
+          "name": "dome_back_right",
+          "from": [
+            0.0,
+            1.5,
+            0.0
+          ],
+          "to": [
+            1.0919999999999999,
+            2.15,
+            1.677
+          ],
+          "color": "#74C7AD"
+        },
+        {
+          "name": "visor",
+          "from": [
+            -1.9,
+            0.1,
+            -3.15
+          ],
+          "to": [
+            1.9,
+            0.35,
+            -2.05
+          ],
+          "color": "#568FC6"
+        },
+        {
+          "name": "visor_front",
+          "from": [
+            -1.4,
+            0.1,
+            -3.45
+          ],
+          "to": [
+            1.4,
+            0.35,
+            -3.15
+          ],
+          "color": "#3D597D"
+        },
+        {
+          "name": "top_button",
+          "from": [
+            -0.35,
+            2.15,
+            -0.35
+          ],
+          "to": [
+            0.35,
+            2.45,
+            0.35
+          ],
+          "color": "#3D597D"
+        },
+        {
+          "name": "rotor_stem",
+          "from": [
+            -0.14,
+            2.45,
+            -0.14
+          ],
+          "to": [
+            0.14,
+            3.2,
+            0.14
+          ],
+          "color": "#EFC04F"
+        },
+        {
+          "name": "rotor_left",
+          "from": [
+            -2.95,
+            3.2,
+            -0.32
+          ],
+          "to": [
+            -0.2,
+            3.43,
+            0.32
+          ],
+          "color": "#E16D72"
+        },
+        {
+          "name": "rotor_right",
+          "from": [
+            0.2,
+            3.2,
+            -0.32
+          ],
+          "to": [
+            2.95,
+            3.43,
+            0.32
+          ],
+          "color": "#F5CF6B"
+        },
+        {
+          "name": "rotor_front",
+          "from": [
+            -0.3,
+            3.23,
+            -2.6
+          ],
+          "to": [
+            0.3,
+            3.46,
+            -0.2
+          ],
+          "color": "#74C7AD"
+        },
+        {
+          "name": "rotor_back",
+          "from": [
+            -0.3,
+            3.23,
+            0.2
+          ],
+          "to": [
+            0.3,
+            3.46,
+            2.6
+          ],
+          "color": "#568FC6"
+        },
+        {
+          "name": "rotor_hub",
+          "from": [
+            -0.37,
+            3.18,
+            -0.37
+          ],
+          "to": [
+            0.37,
+            3.6,
+            0.37
+          ],
+          "color": "#FFF1D5"
+        }
+      ],
+      "files": {
+        "bbmodel": "bbmodel/propeller_cap.bbmodel",
+        "minecraft": "models/item/propeller_cap.json",
+        "texture": "textures/item/propeller_cap.png",
+        "glb": "glb/propeller_cap.glb"
+      }
+    },
+    {
+      "id": "cowboy_hat",
+      "name": "Шериф джунглей",
+      "description": "Песочный стетсон с приподнятыми полями, продольной складкой и маленьким пером.",
+      "cubes": [
+        {
+          "name": "brim_center",
+          "from": [
+            -2.5,
+            0,
+            -2.8
+          ],
+          "to": [
+            2.5,
+            0.3,
+            2.8
+          ],
+          "color": "#BA8052"
+        },
+        {
+          "name": "brim_front",
+          "from": [
+            -2.0,
+            0,
+            -3.2
+          ],
+          "to": [
+            2.0,
+            0.3,
+            -2.8
+          ],
+          "color": "#BA8052"
+        },
+        {
+          "name": "brim_back",
+          "from": [
+            -2.0,
+            0,
+            2.8
+          ],
+          "to": [
+            2.0,
+            0.3,
+            3.2
+          ],
+          "color": "#BA8052"
+        },
+        {
+          "name": "left_curl_lower",
+          "from": [
+            -2.95,
+            0.2,
+            -2.45
+          ],
+          "to": [
+            -2.45,
+            0.65,
+            2.45
+          ],
+          "color": "#CF9B67"
+        },
+        {
+          "name": "right_curl_lower",
+          "from": [
+            2.45,
+            0.2,
+            -2.45
+          ],
+          "to": [
+            2.95,
+            0.65,
+            2.45
+          ],
+          "color": "#CF9B67"
+        },
+        {
+          "name": "left_curl_top",
+          "from": [
+            -3.1,
+            0.65,
+            -2.0
+          ],
+          "to": [
+            -2.7,
+            1.0,
+            2.0
+          ],
+          "color": "#E6BC80"
+        },
+        {
+          "name": "right_curl_top",
+          "from": [
+            2.7,
+            0.65,
+            -2.0
+          ],
+          "to": [
+            3.1,
+            1.0,
+            2.0
+          ],
+          "color": "#E6BC80"
+        },
+        {
+          "name": "crown_base",
+          "from": [
+            -1.6,
+            0.3,
+            -2.2
+          ],
+          "to": [
+            1.6,
+            0.75,
+            2.2
+          ],
+          "color": "#CF9B67"
+        },
+        {
+          "name": "leather_band",
+          "from": [
+            -1.64,
+            0.75,
+            -2.24
+          ],
+          "to": [
+            1.64,
+            1.15,
+            2.24
+          ],
+          "color": "#754C39"
+        },
+        {
+          "name": "crown",
+          "from": [
+            -1.5,
+            1.15,
+            -2.1
+          ],
+          "to": [
+            1.5,
+            2.35,
+            2.1
+          ],
+          "color": "#CF9B67"
+        },
+        {
+          "name": "left_ridge",
+          "from": [
+            -1.4,
+            2.35,
+            -1.9
+          ],
+          "to": [
+            -0.35,
+            3.05,
+            1.9
+          ],
+          "color": "#E6BC80"
+        },
+        {
+          "name": "right_ridge",
+          "from": [
+            0.35,
+            2.35,
+            -1.9
+          ],
+          "to": [
+            1.4,
+            3.05,
+            1.9
+          ],
+          "color": "#E6BC80"
+        },
+        {
+          "name": "center_crease",
+          "from": [
+            -0.35,
+            2.35,
+            -1.9
+          ],
+          "to": [
+            0.35,
+            2.55,
+            1.9
+          ],
+          "color": "#BA8052"
+        },
+        {
+          "name": "buckle_left",
+          "from": [
+            -0.45,
+            0.8,
+            -2.36
+          ],
+          "to": [
+            -0.3,
+            1.1,
+            -2.23
+          ],
+          "color": "#EFC04F"
+        },
+        {
+          "name": "buckle_right",
+          "from": [
+            0.3,
+            0.8,
+            -2.36
+          ],
+          "to": [
+            0.45,
+            1.1,
+            -2.23
+          ],
+          "color": "#EFC04F"
+        },
+        {
+          "name": "buckle_top",
+          "from": [
+            -0.3,
+            0.97,
+            -2.36
+          ],
+          "to": [
+            0.3,
+            1.1,
+            -2.23
+          ],
+          "color": "#FFE28A"
+        },
+        {
+          "name": "buckle_bottom",
+          "from": [
+            -0.3,
+            0.8,
+            -2.36
+          ],
+          "to": [
+            0.3,
+            0.93,
+            -2.23
+          ],
+          "color": "#EFC04F"
+        },
+        {
+          "name": "side_feather_base",
+          "from": [
+            1.49,
+            1.25,
+            0.8
+          ],
+          "to": [
+            1.65,
+            1.75,
+            1.15
+          ],
+          "color": "#6BABC4"
+        },
+        {
+          "name": "side_feather_mid",
+          "from": [
+            1.49,
+            1.75,
+            0.65
+          ],
+          "to": [
+            1.65,
+            2.15,
+            1.05
+          ],
+          "color": "#91DAD3"
+        },
+        {
+          "name": "side_feather_tip",
+          "from": [
+            1.49,
+            2.15,
+            0.5
+          ],
+          "to": [
+            1.65,
+            2.5,
+            0.85
+          ],
+          "color": "#6BABC4"
+        }
+      ],
+      "files": {
+        "bbmodel": "bbmodel/cowboy_hat.bbmodel",
+        "minecraft": "models/item/cowboy_hat.json",
+        "texture": "textures/item/cowboy_hat.png",
+        "glb": "glb/cowboy_hat.glb"
+      }
+    },
+    {
+      "id": "ufo_hat",
+      "name": "Посол с орбиты",
+      "description": "Серебристая тарелка с мятной кабиной, сигнальными огнями и маленькой антенной.",
+      "cubes": [
+        {
+          "name": "head_platform",
+          "from": [
+            -1.2,
+            0,
+            -2.15
+          ],
+          "to": [
+            1.2,
+            0.4,
+            2.15
+          ],
+          "color": "#4F6378"
+        },
+        {
+          "name": "saucer_belly",
+          "from": [
+            -2.25,
+            0.25,
+            -2.55
+          ],
+          "to": [
+            2.25,
+            0.55,
+            2.55
+          ],
+          "color": "#8497AA"
+        },
+        {
+          "name": "wide_saucer_rim",
+          "from": [
+            -2.8,
+            0.55,
+            -2.6
+          ],
+          "to": [
+            2.8,
+            1.0,
+            2.6
+          ],
+          "color": "#BAC8D3"
+        },
+        {
+          "name": "front_saucer_rim",
+          "from": [
+            -2.05,
+            0.55,
+            -3.15
+          ],
+          "to": [
+            2.05,
+            1.0,
+            -2.6
+          ],
+          "color": "#BAC8D3"
+        },
+        {
+          "name": "back_saucer_rim",
+          "from": [
+            -2.05,
+            0.55,
+            2.6
+          ],
+          "to": [
+            2.05,
+            1.0,
+            3.15
+          ],
+          "color": "#BAC8D3"
+        },
+        {
+          "name": "upper_saucer",
+          "from": [
+            -2.1,
+            1.0,
+            -2.6
+          ],
+          "to": [
+            2.1,
+            1.35,
+            2.6
+          ],
+          "color": "#8497AA"
+        },
+        {
+          "name": "cockpit_frame",
+          "from": [
+            -1.55,
+            1.35,
+            -2.0
+          ],
+          "to": [
+            1.55,
+            1.55,
+            2.0
+          ],
+          "color": "#4F6378"
+        },
+        {
+          "name": "cockpit_lower",
+          "from": [
+            -1.45,
+            1.55,
+            -1.9
+          ],
+          "to": [
+            1.45,
+            2.2,
+            1.9
+          ],
+          "color": "#75CBCD"
+        },
+        {
+          "name": "cockpit_upper",
+          "from": [
+            -1.15,
+            2.2,
+            -1.55
+          ],
+          "to": [
+            1.15,
+            2.65,
+            1.55
+          ],
+          "color": "#ADE5DB"
+        },
+        {
+          "name": "cockpit_top",
+          "from": [
+            -0.8,
+            2.65,
+            -1.0
+          ],
+          "to": [
+            0.8,
+            2.95,
+            1.0
+          ],
+          "color": "#75CBCD"
+        },
+        {
+          "name": "cockpit_highlight",
+          "from": [
+            -0.95,
+            2.32,
+            -1.62
+          ],
+          "to": [
+            -0.25,
+            2.5,
+            -1.54
+          ],
+          "color": "#ECFFF1"
+        },
+        {
+          "name": "front_green_light_left",
+          "from": [
+            -1.25,
+            0.65,
+            -3.23
+          ],
+          "to": [
+            -0.8,
+            0.9,
+            -3.14
+          ],
+          "color": "#A6DF91"
+        },
+        {
+          "name": "front_green_light_right",
+          "from": [
+            0.8,
+            0.65,
+            -3.23
+          ],
+          "to": [
+            1.25,
+            0.9,
+            -3.14
+          ],
+          "color": "#A6DF91"
+        },
+        {
+          "name": "rear_green_light",
+          "from": [
+            -0.25,
+            0.65,
+            3.14
+          ],
+          "to": [
+            0.25,
+            0.9,
+            3.23
+          ],
+          "color": "#A6DF91"
+        },
+        {
+          "name": "left_amber_light",
+          "from": [
+            -2.9,
+            0.65,
+            -0.3
+          ],
+          "to": [
+            -2.79,
+            0.9,
+            0.3
+          ],
+          "color": "#F5CF6B"
+        },
+        {
+          "name": "right_amber_light",
+          "from": [
+            2.79,
+            0.65,
+            -0.3
+          ],
+          "to": [
+            2.9,
+            0.9,
+            0.3
+          ],
+          "color": "#F5CF6B"
+        },
+        {
+          "name": "antenna",
+          "from": [
+            -0.08,
+            2.95,
+            -0.08
+          ],
+          "to": [
+            0.08,
+            3.7,
+            0.08
+          ],
+          "color": "#4F6378"
+        },
+        {
+          "name": "antenna_beacon",
+          "from": [
+            -0.24,
+            3.7,
+            -0.24
+          ],
+          "to": [
+            0.24,
+            4.05,
+            0.24
+          ],
+          "color": "#E16D72"
+        }
+      ],
+      "files": {
+        "bbmodel": "bbmodel/ufo_hat.bbmodel",
+        "minecraft": "models/item/ufo_hat.json",
+        "texture": "textures/item/ufo_hat.png",
+        "glb": "glb/ufo_hat.glb"
+      }
+    }
+  ]
+}

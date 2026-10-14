@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Попугайная примерочная</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="viewer.js" defer></script>
+</head>
+<body>
+  <main>
+    <header>
+      <div><p class="eyebrow">VIEWER PARROTS / КОЛЛЕКЦИЯ 01</p><h1>Попугайная примерочная</h1><p class="intro">Восемь шляп. Один очень модный попугай.</p></div>
+      <a class="button pack" href="viewer-parrot-hats.zip" download>Скачать весь набор ↗</a>
+    </header>
+    <div class="workbench">
+      <section class="viewport" aria-label="Трёхмерный предпросмотр">
+        <div class="stage-top"><span id="stage-number">01 / 08</span><span class="live-dot">3D-модель</span></div>
+        <canvas id="stage" aria-label="Шляпа на попугае. Перетаскивайте для поворота, колесо для приближения."></canvas>
+        <div class="stage-bottom"><span>Потяни, чтобы повернуть · Колесо — масштаб</span><button id="reset" class="small-button" type="button">Исходный ракурс</button></div>
+      </section>
+      <aside>
+        <p class="eyebrow" id="hat-id">01</p><h2 id="hat-name">Загрузка моделей…</h2><p id="hat-description"></p>
+        <div class="options">
+          <label><input id="with-parrot" type="checkbox" checked> Примерить на попугая</label>
+          <label><input id="auto-rotate" type="checkbox"> Автоматическое вращение</label>
+        </div>
+        <div class="downloads"><a id="download-bb" class="button primary" download>Скачать для Blockbench</a><a id="download-glb" class="button" download>Скачать .glb</a></div>
+        <p class="file-note">Редактируемые модели и текстуры. Экспорт для Minecraft включён в набор.</p>
+        <p class="fit-note">Попугай здесь — примерка масштаба. Окончательную посадку и скрытие хохолка настроим при добавлении в мод.</p>
+      </aside>
+    </div>
+    <section aria-label="Выбор шляпы"><div class="collection-heading"><h2>Выбери характер</h2><span>Все модели можно открыть и изменить</span></div><div id="gallery" class="gallery"></div></section>
+    <p id="error" class="error" role="alert" hidden></p>
+    <footer>Оригинальная коллекция для Viewer Parrots · Геометрия шляп в предпросмотре совпадает с файлами моделей.</footer>
+  </main>
+</body>
+</html>

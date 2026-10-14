@@ -33,12 +33,12 @@ public class DanceInPlaceGoal extends Goal {
 
 	@Override
 	public boolean canStart() {
-		return this.parrot.isForcedDancing();
+		return isHolding();
 	}
 
 	@Override
 	public boolean shouldContinue() {
-		return this.parrot.isForcedDancing();
+		return isHolding();
 	}
 
 	@Override
@@ -53,11 +53,13 @@ public class DanceInPlaceGoal extends Goal {
 
 	@Override
 	public void stop() {
-		this.parrot.getNavigation().stop();
+		if (isHolding()) this.parrot.getNavigation().stop();
 	}
 
 	@Override
 	public void tick() {
+		// A stale running goal must not cancel navigation owned by a newer accepted command.
+		if (!isHolding()) return;
 		// Навигация останавливается каждый tick: MoveControl мог сохранить цель,
 		// выставленную до начала танца.
 		this.parrot.getNavigation().stop();
@@ -77,5 +79,9 @@ public class DanceInPlaceGoal extends Goal {
 	private boolean hasSupportBelow() {
 		return SafePositionFinder.hasSupportBelow(
 				this.parrot.getWorld(), this.parrot.getBlockPos(), SUPPORT_SCAN_DEPTH);
+	}
+
+	private boolean isHolding() {
+		return this.parrot.isForcedDancing() || this.parrot.isSpinning();
 	}
 }
