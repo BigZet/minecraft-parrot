@@ -49,14 +49,12 @@ public final class ParrotSpeechService implements AutoCloseable {
     private boolean voicesReady;
     private volatile boolean closed;
 
-    private static final class Loaded {
-        final Map<UUID, String> assignments;
-        final String token;
-        Loaded(Map<UUID, String> assignments, String token) {
-            this.assignments = assignments;
-            this.token = token;
-        }
-    }
+    /** One daemon thread for key loading: a stuck PowerShell never holds the writer, and a closed world ignores its late result. */
+    private static final java.util.concurrent.ExecutorService KEY_LOADER = java.util.concurrent.Executors.newSingleThreadExecutor(task -> {
+        Thread thread = new Thread(task, "viewerparrots-key");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     public ParrotSpeechService(ServerContext context, Path configDirectory) {
         this.context = context;
@@ -75,22 +73,37 @@ public final class ParrotSpeechService implements AutoCloseable {
     }
 
     public void onRegistryReady() {
-        context.writer().submit(() -> new Loaded(VoiceAssignments.read(voiceFile), io.github.viewerparrots.control.ControlPanelService.openRouterKey()))
-                .whenComplete((loaded, error) -> {
-                    if (closed || !context.acceptingCommands()) return;
-                    if (error != null) {
-                        ViewerParrotsMod.LOGGER.warn("Speech: unable to load voice assignments or local OpenRouter key.");
-                        return;
-                    }
-                    try {
-                        voices.restore(loaded.assignments);
-                        if (!loaded.token.isBlank()) client = new OpenRouterSpeechClient(loaded.token);
-                        voicesReady = true;
-                        synchronizeVoices();
-                    } catch (RuntimeException invalidData) {
-                        ViewerParrotsMod.LOGGER.warn("Speech: check the saved voice assignments.");
-                    }
-                });
+        // voices.json belongs to the storage writer, as before.
+        context.writer().submit(() -> VoiceAssignments.read(voiceFile)).whenComplete((assignments, error) -> {
+            if (closed || !context.acceptingCommands()) return;
+            if (error != null) {
+                ViewerParrotsMod.LOGGER.warn("Speech: unable to load voice assignments.");
+                return;
+            }
+            try {
+                voices.restore(assignments);
+                voicesReady = true;
+                synchronizeVoices();
+            } catch (RuntimeException invalidData) {
+                ViewerParrotsMod.LOGGER.warn("Speech: check the saved voice assignments.");
+            }
+        });
+        // The key may spawn PowerShell for the DPAPI fallback and wait seconds for it: never on the storage writer
+        // or the game thread. Until it arrives, configured() stays false and !say answers SPEECH_NOT_CONFIGURED.
+        CompletableFuture.supplyAsync(() -> {
+            try {
+                return io.github.viewerparrots.control.ControlPanelService.openRouterKey();
+            } catch (Exception failure) {
+                throw new java.util.concurrent.CompletionException(failure);
+            }
+        }, KEY_LOADER).whenComplete((token, error) -> context.server().execute(() -> {
+            if (closed || !context.acceptingCommands()) return;
+            if (error != null) {
+                ViewerParrotsMod.LOGGER.warn("Speech: unable to load the local OpenRouter key.");
+                return;
+            }
+            if (!token.isBlank() && client == null) client = new OpenRouterSpeechClient(token);
+        }));
     }
 
     public void initializeSettings(io.github.viewerparrots.settings.ModSettings.Speech speech) {
