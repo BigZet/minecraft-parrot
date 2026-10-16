@@ -14,7 +14,7 @@ public final class OpenRouterToken {
         String environment = System.getenv("OPENROUTER_API_KEY");
         if (environment != null && !environment.isBlank()) return environment.strip();
         Path local = configDirectory.resolve("viewerparrots-openrouter-token.txt");
-        if (Files.isRegularFile(local)) return Files.readString(local).strip();
+        if (Files.isRegularFile(local)) return Files.readString(local).replace("﻿", "").strip();
 
         // Reuse the key already configured for the local voice tester on this PC.
         String appData = System.getenv("LOCALAPPDATA");
@@ -23,9 +23,15 @@ public final class OpenRouterToken {
         Path encrypted = Path.of(appData, "ViewerParrots", "openrouter-key.dpapi");
         if (!Files.isRegularFile(encrypted)) return "";
         Path powerShell = Path.of(windows, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
-        String command = "$secret = ConvertTo-SecureString ([Console]::In.ReadToEnd().Trim()); "
+        // The game may inherit a PSModulePath without Windows PowerShell's built-in modules (PowerShell 7 parent,
+        // launcher environment); importing Security by its $PSHOME path keeps ConvertTo-SecureString available.
+        String command = "$ErrorActionPreference='Stop'; "
+                + "Import-Module ($PSHOME+'\\Modules\\Microsoft.PowerShell.Security\\Microsoft.PowerShell.Security.psd1'); "
+                + "$secret = ConvertTo-SecureString ([Console]::In.ReadToEnd().Trim()); "
                 + "([System.Net.NetworkCredential]::new('', $secret)).Password";
-        Process process = new ProcessBuilder(powerShell.toString(), "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", command).start();
+        if (Files.size(encrypted) > 65536) return "";
+        Process process = new ProcessBuilder(powerShell.toString(), "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", command)
+                .redirectError(ProcessBuilder.Redirect.DISCARD).start();
         try {
             try (var input = process.getOutputStream()) {
                 input.write(Files.readString(encrypted, StandardCharsets.UTF_8).strip().replace("\uFEFF", "").getBytes(StandardCharsets.UTF_8));
