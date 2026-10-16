@@ -158,6 +158,10 @@ storage-writer). В contracts ожидание «неизвестный звук
 IDLE, которого с 1.1.0 нет: новые птицы создаются в free, старое IDLE читается
 как free, и планировщик до idle-логики не доходит. Смерть, VANILLA_FINAL,
 замена MISSING и COME после SIT/DANCE остаются покрыты acceptance-сценарием.
+Нестабильный тест: `recoveryticketgametests.savedUnloadedEntitiesRecover…`
+17 октября один раз упал с `RECOVERY_TIMEOUT` при занятой машине и прошёл при
+повторном прогоне; на 1.1.0 он же падал по heap-пробе. Повторный прогон
+`runGameTest` — достаточная проверка.
 Особенность стенда: GameTest-сервер Fabric отвечает isDedicated()=true, поэтому
 ControlPanelService пропускает live-apply настроек, который на одиночном
 сервере стримера выполняется внутри reload; SettingsFixture.reload повторяет
