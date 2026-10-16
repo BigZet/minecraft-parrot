@@ -156,9 +156,18 @@ public final class ViewerParrotCommands {
 				.then(gameAction("love", ParrotAction.LOVE))
 				.then(gameAction("hat", ParrotAction.HAT))
 				.then(gameAction("dehat", ParrotAction.DEHAT))
-				.then(gameAction("color", ParrotAction.COLOR))
-				.then(gameAction("name", ParrotAction.NAME))
-				.then(gameAction("emote", ParrotAction.EMOTE))
+				.then(gameActionWithText("color", ParrotAction.COLOR, text -> new ActionParameters.Color(
+						io.github.viewerparrots.cosmetic.ParrotColors.parse(text).orElseThrow(() -> new IllegalArgumentException("Неизвестный цвет: " + text)))))
+				.then(gameActionWithText("name", ParrotAction.NAME, text -> new ActionParameters.Nickname(DisplayName.of(text))))
+				.then(gameActionWithText("emote", ParrotAction.EMOTE, text -> new ActionParameters.Emote(
+						io.github.viewerparrots.cosmetic.ParrotEmotes.parse(text).orElseThrow(() -> new IllegalArgumentException("Неизвестная эмоция: " + text)))))
+				.then(CommandManager.literal("fight")
+						.requires(source -> allowed(source, ParrotAction.FIGHT))
+						.then(viewerIdArgument()
+								.then(CommandManager.argument("text", StringArgumentType.greedyString())
+										.executes(ctx -> runGameAction(ctx, ParrotAction.FIGHT,
+												StringArgumentType.getString(ctx, "viewerId"),
+												() -> new ActionParameters.Opponent(StringArgumentType.getString(ctx, "text")))))))
 				.then(gameAction("accept", ParrotAction.ACCEPT))
 				.then(gameAction("decline", ParrotAction.DECLINE))
 				.then(gameAction("exp", ParrotAction.EXP))
@@ -195,6 +204,30 @@ public final class ViewerParrotCommands {
 			String rawViewerId) {
 		return withViewerId(ctx, rawViewerId, (context, source, viewerId) ->
 				submit(context, source, viewerId, action, ActionParameters.None.INSTANCE, null));
+	}
+
+	/** Игровое действие с необязательным текстовым аргументом: без него — как у чата без аргумента. */
+	private static LiteralArgumentBuilder<ServerCommandSource> gameActionWithText(String literal,
+			ParrotAction action, java.util.function.Function<String, ActionParameters> parser) {
+		return CommandManager.literal(literal)
+				.requires(source -> allowed(source, action))
+				.then(viewerIdArgument()
+						.executes(ctx -> runGameAction(ctx, action, StringArgumentType.getString(ctx, "viewerId")))
+						.then(CommandManager.argument("text", StringArgumentType.greedyString())
+								.executes(ctx -> runGameAction(ctx, action, StringArgumentType.getString(ctx, "viewerId"),
+										() -> parser.apply(StringArgumentType.getString(ctx, "text"))))));
+	}
+
+	private static int runGameAction(CommandContext<ServerCommandSource> ctx, ParrotAction action,
+			String rawViewerId, java.util.function.Supplier<ActionParameters> parameters) {
+		return withViewerId(ctx, rawViewerId, (context, source, viewerId) -> {
+			try {
+				return submit(context, source, viewerId, action, parameters.get(), null);
+			} catch (IllegalArgumentException invalidText) {
+				source.sendError(errorText(ErrorCode.INVALID_ARGUMENT, invalidText.getMessage()));
+				return 0;
+			}
+		});
 	}
 
 	private static int say(CommandContext<ServerCommandSource> ctx, String rawViewerId, String text) {
