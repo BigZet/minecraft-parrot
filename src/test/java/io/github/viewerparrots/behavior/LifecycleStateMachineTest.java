@@ -109,7 +109,7 @@ class LifecycleStateMachineTest {
 				ParrotAction.FOLLOW, ParrotAction.SIT, ParrotAction.DANCE, ParrotAction.HAT, ParrotAction.DEHAT,
 				ParrotAction.FREE, ParrotAction.FREEFOLLOW, ParrotAction.VIEW, ParrotAction.DEVIEW,
 				ParrotAction.ARM, ParrotAction.DEARM,
-				ParrotAction.SCREAM, ParrotAction.LOVE, ParrotAction.EXP}) {
+				ParrotAction.SCREAM, ParrotAction.LOVE, ParrotAction.EXP, ParrotAction.ROULETTE}) {
 			assertTrue(LifecycleStateMachine.allows(LifecycleState.LOADED, action), action + " в LOADED");
 			for (LifecycleState state : LifecycleState.values()) {
 				if (state == LifecycleState.LOADED) {

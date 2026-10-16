@@ -11,7 +11,7 @@ import java.util.UUID;
  * <p>{@code viewerId} сам по себе прав не даёт, поэтому его здесь нет вовсе — он является
  * частью {@link CommandRequest}, то есть данными, а не полномочиями.
  */
-public record ActorContext(SourceType sourceType, UUID senderUuid, int permissionLevel, String sourceKey) {
+public record ActorContext(SourceType sourceType, UUID senderUuid, int permissionLevel, String sourceKey, java.util.Set<io.github.viewerparrots.settings.TwitchRole> twitchRoles) {
 
 	public enum SourceType {
 		PLAYER,
@@ -19,10 +19,19 @@ public record ActorContext(SourceType sourceType, UUID senderUuid, int permissio
 		RCON,
 		COMMAND_BLOCK,
 		/** Другой Java-мод в том же процессе. Не является security sandbox (раздел 12 ТЗ). */
-		INTERNAL_API
+		INTERNAL_API,
+        TWITCH
 	}
 
-	public ActorContext {
+	public ActorContext(SourceType sourceType, UUID senderUuid, int permissionLevel, String sourceKey) {
+        this(sourceType, senderUuid, permissionLevel, sourceKey, java.util.Set.of());
+    }
+    public static ActorContext twitch(String viewerId, java.util.Set<io.github.viewerparrots.settings.TwitchRole> roles) {
+        return new ActorContext(SourceType.TWITCH, null, 4, viewerId, roles);
+    }
+    public boolean isTwitch() { return sourceType == SourceType.TWITCH; }
+    public ActorContext {
+        twitchRoles = java.util.Set.copyOf(twitchRoles);
 		Objects.requireNonNull(sourceType, "sourceType");
 		Objects.requireNonNull(sourceKey, "sourceKey");
 		if (permissionLevel < 0 || permissionLevel > 4) {

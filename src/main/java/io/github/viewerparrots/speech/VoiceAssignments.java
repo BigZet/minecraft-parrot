@@ -28,10 +28,14 @@ public final class VoiceAssignments {
 			"rSfuQoQ3FY8SVKeraMAp", "1BfrkuYXmEwp8AWqSLWk", "Pt5YrLNyu6d2s3s4CVMg",
 			"bwCXcoVxWNYMlC6Esa8u", "LeAiLsg4dAEgTA94l0il", "Rmv8zCb2IRE895dK1qWB",
 			"oQL5kq26ctJzupM0mJot", "pPdl9cQBQq4p6mRkZy2Z", "Z7RrOqZFTyLpIlzCgfsp",
-			"ygoBNrnmTEdu5NtDTmAY", "n7Wi4g1bhpw4Bs8HK5ph", "Z9LM7NBnQ8aOZKIXkd5S");
+			"ygoBNrnmTEdu5NtDTmAY", "n7Wi4g1bhpw4Bs8HK5ph", "Z9LM7NBnQ8aOZKIXkd5S",
+			"6A9D8WSMm4rFsg2DWFeE", "4RloeZf2FRvGiu4uoKOf", "XJ2fW4ybq7HouelYYGcL",
+			"dfZGXKiIzjizWtJ0NgPy", "VD1if7jDVYtAKs4P0FIY", "vGQNBgLaiM3EdZtxIiuY",
+			"piI8Kku0DcvcL6TTSeQt", "PoHUWWWMHFrA8z7Q88pu", "y3H6zY6KvCH2pEuQjmv8",
+			"ecp3DWciuUyW7BYM7II1", "eBvoGh8YGJn1xokno71w", "1cxc5c3E9K6F1wlqOJGV");
 	private static final Gson JSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
 
-	private final List<String> pool;
+	private List<String> pool;
 	private final Random random;
 	private final Map<UUID, String> assignments = new HashMap<>();
 
@@ -66,6 +70,15 @@ public final class VoiceAssignments {
 		return selected;
 	}
 
+    public synchronized void updatePool(List<String> enabled) {
+        if (enabled.isEmpty() || enabled.stream().anyMatch(v -> !v.matches("[A-Za-z0-9_-]{1,128}"))
+                || new HashSet<>(enabled).size() != enabled.size()) throw new IllegalArgumentException("Invalid voice pool");
+        pool = List.copyOf(enabled);
+    }
+    public synchronized void setVoice(UUID incarnation, String voice) {
+        if (voice == null || !voice.matches("[A-Za-z0-9_-]{1,128}")) throw new IllegalArgumentException("Invalid voice ID");
+        assignments.put(Objects.requireNonNull(incarnation), voice);
+    }
 	public synchronized void reconcile(Set<UUID> active) {
 		Set<UUID> current = Set.copyOf(active);
 		assignments.keySet().retainAll(current);
@@ -77,9 +90,6 @@ public final class VoiceAssignments {
 
 	public synchronized void restore(Map<UUID, String> saved) {
 		Map<UUID, String> validated = validAssignments(saved);
-		if (!pool.containsAll(validated.values())) {
-			throw new IllegalArgumentException("Saved assignment contains an unknown voice.");
-		}
 		assignments.clear();
 		assignments.putAll(validated);
 	}
@@ -131,7 +141,7 @@ public final class VoiceAssignments {
 
 	private static Map<UUID, String> validAssignments(Map<UUID, String> saved) {
 		Map<UUID, String> validated = Map.copyOf(saved);
-		if (validated.values().stream().anyMatch(String::isBlank)) {
+		if (validated.values().stream().anyMatch(v -> !v.matches("[A-Za-z0-9_-]{1,128}"))) {
 			throw new IllegalArgumentException("Voice assignment must not be blank.");
 		}
 		return validated;

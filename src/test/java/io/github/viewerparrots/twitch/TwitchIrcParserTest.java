@@ -1,10 +1,14 @@
 package io.github.viewerparrots.twitch;
 
+import io.github.viewerparrots.settings.TwitchRole;
+import java.util.EnumSet;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TwitchIrcParserTest {
@@ -33,6 +37,51 @@ class TwitchIrcParserTest {
 					TwitchIrcParser.parse(tags + " :viewer!viewer@viewer.tmi.twitch.tv "
 							+ "PRIVMSG #streamer :!sit").orElseThrow());
 		}
+	}
+
+	@Test
+	void collectsEveryRecognizedBadgeAndFallsBackToOrdinaryViewer() {
+		var privileged = TwitchIrcParser.parse("@user-id=42;badges=broadcaster/1,moderator/1,vip/1,subscriber/24 "
+				+ ":viewer!viewer@host PRIVMSG #streamer :!parrot").orElseThrow();
+
+		assertEquals(Set.of(TwitchRole.EVERYONE, TwitchRole.BROADCASTER, TwitchRole.MODERATOR,
+				TwitchRole.VIP, TwitchRole.SUBSCRIBER), privileged.roles());
+		for (String badges : new String[]{"", "partner/1,glhf-pledge/1", "notmoderator/1,vipish/1",
+				"broadcaster,moderator/,subscriber/no-version,vip/1/extra"}) {
+			var ordinary = TwitchIrcParser.parse("@user-id=42;badges=" + badges
+					+ " :viewer!viewer@host PRIVMSG #streamer :!parrot broadcaster/1 mod=1 subscriber=1").orElseThrow();
+			assertEquals(Set.of(TwitchRole.EVERYONE), ordinary.roles());
+		}
+	}
+
+	@Test
+	void recognizesLegacyModeratorAndSubscriberFlagsOnlyWhenExactlyOne() {
+		var flagged = TwitchIrcParser.parse("@user-id=42;mod=1;subscriber=1 "
+				+ ":viewer!viewer@host PRIVMSG #streamer :!sit").orElseThrow();
+		assertEquals(Set.of(TwitchRole.EVERYONE, TwitchRole.MODERATOR, TwitchRole.SUBSCRIBER), flagged.roles());
+		for (String flags : new String[]{"mod=0;subscriber=0", "mod=true;subscriber=yes", "mod=10;subscriber=-1"}) {
+			var ordinary = TwitchIrcParser.parse("@user-id=42;" + flags
+					+ " :viewer!viewer@host PRIVMSG #streamer :!sit").orElseThrow();
+			assertEquals(Set.of(TwitchRole.EVERYONE), ordinary.roles());
+		}
+	}
+
+	@Test
+	void founderBadgeCountsAsSubscriptionWithoutTheSubscriberFlag() {
+		var founder = TwitchIrcParser.parse("@user-id=42;badges=founder/0;subscriber=0 "
+				+ ":viewer!viewer@host PRIVMSG #streamer :!sit").orElseThrow();
+
+		assertEquals(Set.of(TwitchRole.EVERYONE, TwitchRole.SUBSCRIBER), founder.roles());
+	}
+
+	@Test
+	void chatMessageCopiesRoleMetadataSoCallersCannotChangeItAfterIngress() {
+		Set<TwitchRole> supplied = EnumSet.of(TwitchRole.EVERYONE, TwitchRole.VIP);
+		var message = new TwitchChatMessage("streamer", "42", "Viewer", "!sit", "roles", supplied);
+		supplied.add(TwitchRole.BROADCASTER);
+
+		assertEquals(Set.of(TwitchRole.EVERYONE, TwitchRole.VIP), message.roles());
+		assertThrows(UnsupportedOperationException.class, () -> message.roles().add(TwitchRole.MODERATOR));
 	}
 
 	@ParameterizedTest

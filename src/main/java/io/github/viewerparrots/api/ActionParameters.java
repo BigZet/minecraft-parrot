@@ -35,7 +35,7 @@ public sealed interface ActionParameters permits ActionParameters.None, ActionPa
         @Override public boolean supports(ParrotAction action) { return action == ParrotAction.LIST; }
     }
     record Speech(String text) implements ActionParameters {
-        public Speech { text = SpeechText.firstThirtyWords(text); }
+        public Speech { text = SpeechText.firstWords(text, 200); }
         @Override public boolean supports(ParrotAction action) { return action == ParrotAction.SAY; }
     }
 }

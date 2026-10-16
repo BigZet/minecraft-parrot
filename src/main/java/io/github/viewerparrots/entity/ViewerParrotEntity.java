@@ -13,6 +13,7 @@ import io.github.viewerparrots.behavior.BehaviorPolicy;
 import io.github.viewerparrots.domain.BehaviorState;
 import io.github.viewerparrots.bootstrap.ServerContext;
 import io.github.viewerparrots.domain.ViewerId;
+import io.github.viewerparrots.control.ControlPanelService;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.MovementType;
 import net.minecraft.entity.attribute.DefaultAttributeContainer;
@@ -278,13 +279,18 @@ public class ViewerParrotEntity extends ParrotEntity {
 	public boolean isSpinning() {
 		long started = this.dataTracker.get(SPIN_STARTED_AT);
 		long elapsed = this.getWorld().getTime() - started;
-		return started >= 0 && elapsed >= 0 && elapsed < ParrotAction.SPIN_DURATION_TICKS;
+		return started >= 0 && elapsed >= 0 && elapsed < ControlPanelService.settings().active().gameplay().spinDurationTicks();
 	}
 
 	/** Ten turns per second; thirty complete turns end in the normal orientation. */
 	public float getSpinAngle(float tickDelta) {
 		if (!isSpinning()) return 0.0f;
-		return (this.getWorld().getTime() - this.dataTracker.get(SPIN_STARTED_AT) + tickDelta) * 180.0f;
+		return (float) ((this.getWorld().getTime() - this.dataTracker.get(SPIN_STARTED_AT) + tickDelta)
+				* ControlPanelService.settings().active().gameplay().spinDegreesPerTick());
+	}
+
+	@Override public int getMaxHeadRotation() {
+		return Math.round(ControlPanelService.settings().active().gameplay().headMaxAngle());
 	}
 
 	/**

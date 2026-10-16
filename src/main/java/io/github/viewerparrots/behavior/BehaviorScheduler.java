@@ -14,6 +14,7 @@ import io.github.viewerparrots.entity.HostileThreatAdapter;
 import io.github.viewerparrots.entity.ParrotEntityController;
 import io.github.viewerparrots.entity.SafePositionFinder;
 import io.github.viewerparrots.entity.ViewerParrotEntity;
+import io.github.viewerparrots.control.ControlPanelService;
 import net.minecraft.network.packet.s2c.play.PositionFlag;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
@@ -218,12 +219,13 @@ public final class BehaviorScheduler {
 		}
 		boolean sameWorld = sameWorld(parrot, target);
 		double distance = sameWorld ? parrot.squaredDistanceTo(target) : Double.POSITIVE_INFINITY;
-		if (distance <= FREE_FOLLOW_RETURN_RADIUS * FREE_FOLLOW_RETURN_RADIUS) {
+		var gameplay = ControlPanelService.settings().active().gameplay();
+		if (distance <= gameplay.freefollowReturnDistance() * gameplay.freefollowReturnDistance()) {
 			if (runtime.isFreeFollowCatchingUp()) parrot.getNavigation().stop();
 			runtime.setFreeFollowCatchingUp(false);
 			return;
 		}
-		if (!runtime.isFreeFollowCatchingUp() && distance <= FREE_FOLLOW_RADIUS * FREE_FOLLOW_RADIUS) return;
+		if (!runtime.isFreeFollowCatchingUp() && distance <= gameplay.freefollowRadius() * gameplay.freefollowRadius()) return;
 		runtime.setFreeFollowCatchingUp(true);
 		if (distance > Math.pow(context.config().come().maxPathfindDistance(), 2)) {
 			if (!sameWorld && !context.config().come().crossDimensionTeleport()) {

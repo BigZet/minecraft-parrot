@@ -32,12 +32,16 @@ public final class ParrotSpeechService implements AutoCloseable {
     private final Path voiceFile;
     private final Path configDirectory;
     private final VoiceAssignments voices = new VoiceAssignments(VoiceAssignments.DEFAULT_VOICES, new Random());
-    private final ThreadPoolExecutor synthesis = new ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS,
-            new ArrayBlockingQueue<>(16), task -> {
+    private ThreadPoolExecutor synthesis = createWorker(16);
+    private int queueCapacity = 16;
+    private final java.util.List<OpenRouterSpeechClient> retiredClients = new java.util.ArrayList<>();
+    private final java.util.Map<UUID, java.util.concurrent.Future<?>> running = new HashMap<>();
+    private static ThreadPoolExecutor createWorker(int capacity) { return new ThreadPoolExecutor(1, 1, 0, TimeUnit.SECONDS,
+            new ArrayBlockingQueue<>(capacity), task -> {
                 Thread thread = new Thread(task, "viewerparrots-speech");
                 thread.setDaemon(true);
                 return thread;
-            }, new ThreadPoolExecutor.AbortPolicy());
+            }, new ThreadPoolExecutor.AbortPolicy()); }
     private record PendingSpeech(UUID commandId, CompletableFuture<CommandResult> completion) { }
     private final Map<ViewerId, PendingSpeech> pending = new HashMap<>();
     private OpenRouterSpeechClient client;
@@ -71,7 +75,7 @@ public final class ParrotSpeechService implements AutoCloseable {
     }
 
     public void onRegistryReady() {
-        context.writer().submit(() -> new Loaded(VoiceAssignments.read(voiceFile), OpenRouterToken.load(configDirectory)))
+        context.writer().submit(() -> new Loaded(VoiceAssignments.read(voiceFile), io.github.viewerparrots.control.ControlPanelService.openRouterKey()))
                 .whenComplete((loaded, error) -> {
                     if (closed || !context.acceptingCommands()) return;
                     if (error != null) {
@@ -89,6 +93,36 @@ public final class ParrotSpeechService implements AutoCloseable {
                 });
     }
 
+    public void initializeSettings(io.github.viewerparrots.settings.ModSettings.Speech speech) {
+        synthesis.shutdownNow(); queueCapacity = speech.queueCapacity(); synthesis = createWorker(queueCapacity);
+        applySettings(speech);
+    }
+    public void applySettings(io.github.viewerparrots.settings.ModSettings.Speech speech) {
+        var enabled = speech.voices().stream().filter(io.github.viewerparrots.settings.ModSettings.Voice::enabled)
+                .map(io.github.viewerparrots.settings.ModSettings.Voice::id).toList();
+        if (!enabled.isEmpty()) voices.updatePool(enabled);
+        if (voicesReady) synchronizeVoices();
+    }
+    public void replaceKey(String key) {
+        var previous = client; client = new OpenRouterSpeechClient(key);
+        if (previous != null) retiredClients.add(previous);
+    }
+    public CompletableFuture<Void> setVoice(ViewerId viewer, String voice) {
+        if (!voicesReady) return CompletableFuture.failedFuture(new IllegalStateException("Голоса ещё загружаются"));
+        if (io.github.viewerparrots.control.ControlPanelService.settings().active().speech().voices().stream().noneMatch(v -> v.id().equals(voice)))
+            return CompletableFuture.failedFuture(new IllegalArgumentException("Неизвестный голос"));
+        var record = context.registry().find(viewer).orElseThrow(() -> new IllegalArgumentException("Птица не найдена"));
+        voices.setVoice(record.incarnationId(), voice);
+        var snapshot = voices.snapshot();
+        voiceWrite = context.writer().submit(() -> { VoiceAssignments.write(voiceFile, snapshot); return (Void) null; });
+        return voiceWrite;
+    }
+    public void stopPending() {
+        var jobs = Map.copyOf(pending); pending.clear();
+        for (var task : running.values()) task.cancel(true);
+        running.clear(); synthesis.getQueue().clear();
+        for (var job : jobs.values()) job.completion().complete(CommandResult.failed(job.commandId(), ErrorCode.INVALID_STATE, null));
+    }
     private void synchronizeVoices() {
         Map<UUID, String> before = voices.snapshot();
         var records = context.registry().allSorted();
@@ -114,14 +148,21 @@ public final class ParrotSpeechService implements AutoCloseable {
     public int pendingCount() { return pending.size(); }
 
     public CompletableFuture<CommandResult> say(UUID commandId, ViewerId viewer, String rawText) {
+        return say(commandId, io.github.viewerparrots.api.ActorContext.console(4), viewer, rawText);
+    }
+    public CompletableFuture<CommandResult> say(UUID commandId, io.github.viewerparrots.api.ActorContext actor, ViewerId viewer, String rawText) {
         if (!context.server().isOnThread()) throw new IllegalStateException("speech submission must use the server thread");
-        if (!configured()) return reject(commandId, ErrorCode.SPEECH_NOT_CONFIGURED);
+        var access = io.github.viewerparrots.settings.CommandAccess.evaluate(actor, ParrotAction.SAY, viewer);
+        if (!access.allowed()) return reject(commandId, io.github.viewerparrots.settings.CommandAccess.error(access));
+        var speechSettings = io.github.viewerparrots.control.ControlPanelService.settings().active().speech();
+        if (!speechSettings.enabled() || !configured()) return reject(commandId, ErrorCode.SPEECH_NOT_CONFIGURED);
+        var acceptedClient = client;
         var maybeRecord = context.registry().find(viewer);
         if (maybeRecord.isEmpty()) return reject(commandId, ErrorCode.VIEWER_NOT_FOUND);
         if (!context.allowsMutations()) return reject(commandId, ErrorCode.STORAGE_UNAVAILABLE);
         if (context.lifecycle(viewer) != LifecycleState.LOADED) return reject(commandId, ErrorCode.ENTITY_UNRESOLVED);
         if (pending.containsKey(viewer)) return reject(commandId, ErrorCode.OPERATION_PENDING);
-        if (pending.size() >= 17) return reject(commandId, ErrorCode.SERVER_BUSY);
+        if (pending.size() >= queueCapacity + 1) return reject(commandId, ErrorCode.SERVER_BUSY);
         var entity = context.loadedIndex().find(viewer).or(() -> context.shoulderService().find(viewer)).orElse(null);
         if (entity == null || !entity.isAlive()) return reject(commandId, ErrorCode.PARROT_ENTITY_MISSING);
         var listener = context.server().getPlayerManager().getPlayerList().stream()
@@ -133,7 +174,7 @@ public final class ParrotSpeechService implements AutoCloseable {
         var decision = context.rateLimiter().check(ParrotAction.SAY);
         if (!decision.allowed()) return CompletableFuture.completedFuture(CommandResult.retryLater(commandId, ErrorCode.GLOBAL_RATE_LIMITED, decision.retryAfterTicks()));
 
-        String text = SpeechText.firstThirtyWords(rawText);
+        String text = SpeechText.firstWords(rawText, speechSettings.maxWords());
         ViewerParrotRecord identity = maybeRecord.get();
         String voice = voices.assign(identity.incarnationId());
         UUID entityId = entity.getUuid();
@@ -141,7 +182,7 @@ public final class ParrotSpeechService implements AutoCloseable {
         CompletableFuture<CommandResult> completed = new CompletableFuture<>();
         pending.put(viewer, new PendingSpeech(commandId, completed));
         context.rateLimiter().tryAcquire(ParrotAction.SAY);
-        context.cooldowns().consume(viewer, ParrotAction.SAY, ParrotAction.SAY_COOLDOWN_TICKS);
+        context.cooldowns().consume(viewer, ParrotAction.SAY, access.cooldownTicks());
         publish(identity, commandId, ParrotEvent.Type.COMMAND_ACCEPTED, null);
         voiceWrite.whenComplete((ignored, saveError) -> {
             if (closed || completed.isDone()) return;
@@ -150,19 +191,27 @@ public final class ParrotSpeechService implements AutoCloseable {
                 return;
             }
             try {
-                synthesis.execute(() -> {
+                var task = synthesis.submit(() -> {
                     if (closed || completed.isDone()) return;
                     byte[] pcm = null;
-                    try { pcm = client.synthesize(voice, text); }
+                    ErrorCode failureCode = ErrorCode.SPEECH_FAILED;
+                    try {
+                        var usage = io.github.viewerparrots.control.ControlPanelService.usage();
+                        if (usage == null) throw new IllegalStateException("Usage unavailable");
+                        if (usage.record(SpeechText.wordCount(text), speechSettings.hourlyRequests(), speechSettings.hourlyWords()))
+                            pcm = acceptedClient.synthesize(voice, text, speechSettings.model(), speechSettings.timeoutSeconds());
+                        else failureCode = ErrorCode.SPEECH_LIMIT_REACHED;
+                    }
                     catch (Exception failure) {
                         if (!closed) ViewerParrotsMod.LOGGER.warn("Speech: OpenRouter synthesis failed ({})", failure.getClass().getSimpleName());
                     }
                     if (closed) return;
                     byte[] audio = pcm;
+                    ErrorCode finalFailure = failureCode;
                     context.server().execute(() -> {
                         if (closed || completed.isDone()) return;
                         if (audio == null) {
-                            finish(identity, commandId, completed, CommandResult.failed(commandId, ErrorCode.SPEECH_FAILED, null));
+                            finish(identity, commandId, completed, CommandResult.failed(commandId, finalFailure, null));
                             return;
                         }
                         var current = context.registry().find(viewer);
@@ -180,6 +229,7 @@ public final class ParrotSpeechService implements AutoCloseable {
                         finish(identity, commandId, completed, CommandResult.succeeded(commandId, "viewerparrots.say.ok", CommandResult.details("viewerId", viewer.value())));
                     });
                 });
+                running.put(commandId, task);
             } catch (RejectedExecutionException full) {
                 finish(identity, commandId, completed, CommandResult.rejected(commandId, ErrorCode.SERVER_BUSY));
             }
@@ -192,6 +242,7 @@ public final class ParrotSpeechService implements AutoCloseable {
     }
 
     private void finish(ViewerParrotRecord identity, UUID commandId, CompletableFuture<CommandResult> completed, CommandResult result) {
+        running.remove(commandId);
         pending.computeIfPresent(identity.viewerId(), (viewer, job) -> job.completion() == completed ? null : job);
         publish(identity, commandId, ParrotEvent.Type.COMMAND_COMPLETED, result.code() == null ? null : result.code().name());
         completed.complete(result);
@@ -206,6 +257,7 @@ public final class ParrotSpeechService implements AutoCloseable {
         closed = true;
         synthesis.shutdownNow();
         if (client != null) client.close();
+        retiredClients.forEach(OpenRouterSpeechClient::close);
         for (PendingSpeech job : Map.copyOf(pending).values()) {
             // API shutdown also clears its completion cache; no old-world callback survives.
             job.completion().complete(CommandResult.failed(job.commandId(), ErrorCode.INVALID_STATE, null));

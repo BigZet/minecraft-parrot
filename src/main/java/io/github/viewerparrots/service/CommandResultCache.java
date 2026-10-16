@@ -31,14 +31,7 @@ public final class CommandResultCache {
 
 	public CommandResultCache(GameClock clock) {
 		this.clock = Objects.requireNonNull(clock, "clock");
-		this.entries = new LinkedHashMap<>(16, 0.75f, false) {
-			@Override
-			protected boolean removeEldestEntry(Map.Entry<UUID, Entry> eldest) {
-				// Ограничение по размеру: очередь futures не должна расти без предела.
-				if (size() > MAX_ENTRIES) cancel(eldest.getValue());
-				return size() > MAX_ENTRIES;
-			}
-		};
+		this.entries = new LinkedHashMap<>();
 	}
 
 	private record Entry(CommandResult result, long expiresAtTick, CompletableFuture<CommandResult> completion) {
@@ -49,7 +42,7 @@ public final class CommandResultCache {
 		if (entry == null) {
 			return Optional.empty();
 		}
-		if (this.clock.currentTick() >= entry.expiresAtTick()) {
+		if (entry.result().status().isTerminal() && this.clock.currentTick() >= entry.expiresAtTick()) {
 			this.entries.remove(commandId);
 			cancel(entry);
 			return Optional.empty();
@@ -60,6 +53,12 @@ public final class CommandResultCache {
 	public void remember(CommandResult result) {
 		Objects.requireNonNull(result, "result");
 		Entry previous = this.entries.get(result.commandId());
+		if (previous == null && this.entries.size() >= MAX_ENTRIES) {
+			var oldestTerminal = this.entries.entrySet().stream().filter(entry -> entry.getValue().result().status().isTerminal())
+					.map(Map.Entry::getKey).findFirst();
+			if (oldestTerminal.isEmpty()) throw new java.util.concurrent.RejectedExecutionException("Pending command cache is full");
+			this.entries.remove(oldestTerminal.get());
+		}
 		CompletableFuture<CommandResult> completion = previous == null
 				? new CompletableFuture<>() : previous.completion();
 		this.entries.put(result.commandId(),
@@ -85,6 +84,10 @@ public final class CommandResultCache {
 
 	public int size() {
 		return this.entries.size();
+	}
+
+	public boolean hasCapacity() {
+		return this.entries.size() < MAX_ENTRIES || this.entries.values().stream().anyMatch(entry -> entry.result().status().isTerminal());
 	}
 
 	public void clear() {

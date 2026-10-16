@@ -24,14 +24,20 @@ class CommandRequestTest {
                 ParrotAction.SIT, ActionParameters.None.INSTANCE).viewerId());
     }
 
-    @Test void speechParametersNormalizeLimitAndOnlySupportSay() {
+    @Test void speechParametersNormalizeWithoutApplyingTheProfilesLowerWordLimit() {
         String thirty = "1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30";
         var speech = new ActionParameters.Speech("\u00a0" + thirty + "\t31 32");
-        assertEquals(thirty, speech.text());
+        assertEquals(thirty + " 31 32", speech.text());
         assertTrue(speech.supports(ParrotAction.SAY));
         assertFalse(speech.supports(ParrotAction.SCREAM));
         assertFalse(ActionParameters.None.INSTANCE.supports(ParrotAction.SAY));
         assertThrows(IllegalArgumentException.class, () -> new ActionParameters.Speech("\u00a0\t"));
+    }
+
+    @Test void speechParametersRetainASeparateHardSafetyLimitOfTwoHundredWords() {
+        String text = java.util.stream.IntStream.rangeClosed(1, 201).mapToObj(Integer::toString)
+                .collect(java.util.stream.Collectors.joining(" "));
+        assertEquals(200, new ActionParameters.Speech(text).text().split(" ").length);
     }
 
     @Test void speechCannotBeSubmittedWithoutItsViewer() {
@@ -69,5 +75,11 @@ class CommandRequestTest {
             assertThrows(IllegalArgumentException.class, () -> new CommandRequest(UUID.randomUUID(), null,
                     action, ActionParameters.None.INSTANCE));
         }
+    }
+
+    @Test void rouletteRequiresViewerAndAcceptsNoParameters() {
+        assertTrue(ActionParameters.None.INSTANCE.supports(ParrotAction.ROULETTE));
+        assertThrows(IllegalArgumentException.class, () -> new CommandRequest(UUID.randomUUID(), null,
+                ParrotAction.ROULETTE, ActionParameters.None.INSTANCE));
     }
 }

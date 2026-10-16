@@ -251,6 +251,7 @@ public final class FabricLifecycleAdapter {
 			context.behaviorScheduler().tick();
 			CheckpointScheduler.tick(context);
 			TwitchChatBridge.tick(context);
+			context.rouletteService().tick();
 		});
 	}
 

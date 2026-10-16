@@ -42,6 +42,10 @@ public final class DefaultViewerParrotApi implements ViewerParrotApi {
             AuditLog.debug("api_command_cached", terminalIdentity(request, identity), previous.get().status().name(), null, started, Map.of(), null);
             return results.completion(request.commandId());
         }
+        var access = io.github.viewerparrots.settings.CommandAccess.evaluate(actor, request.action(), request.viewerId());
+        if (!access.allowed()) return earlyRejection(request, CommandResult.rejected(request.commandId(),
+                io.github.viewerparrots.settings.CommandAccess.error(access)), identity, started);
+        if (!results.hasCapacity()) return CompletableFuture.completedFuture(CommandResult.rejected(request.commandId(), ErrorCode.SERVER_BUSY));
         if (request.action().category() == ParrotAction.Category.DIAGNOSTIC) {
             var decision = context.rateLimiter().tryAcquireDiagnostic(actor.sourceKey());
             if (!decision.allowed()) return earlyRejection(request,
@@ -91,11 +95,11 @@ public final class DefaultViewerParrotApi implements ViewerParrotApi {
             case RESPAWN -> context.parrotService().respawn(id, actor, viewer);
             case SETSTREAMER -> context.streamerService().assign(id, actor, ((ActionParameters.Target) request.parameters()).playerUuid());
             case RECONCILE -> CompletableFuture.completedFuture(context.parrotService().reconcile(id, actor, viewer));
-            case COME, FOLLOW, FREE, FREEFOLLOW, VIEW, DEVIEW, ARM, DEARM, SIT, DANCE, SPIN, SCREAM, LOVE, HAT, DEHAT, EXP -> {
+            case COME, FOLLOW, FREE, FREEFOLLOW, VIEW, DEVIEW, ARM, DEARM, SIT, DANCE, SPIN, SCREAM, LOVE, HAT, DEHAT, EXP, ROULETTE -> {
                 CommandResult initial = context.commandService().submit(id, actor, request.action(), viewer);
                 yield initial.status() == CommandStatus.ACCEPTED ? context.commandService().completion(id) : CompletableFuture.completedFuture(initial);
             }
-            case SAY -> context.speechService().say(id, viewer, ((ActionParameters.Speech) request.parameters()).text());
+            case SAY -> context.speechService().say(id, actor, viewer, ((ActionParameters.Speech) request.parameters()).text());
             case RELOAD -> context.reload(id, actor);
             case SAVE -> {
                 if (!context.allowsMutations()) yield rejected(request, ErrorCode.STORAGE_UNAVAILABLE);

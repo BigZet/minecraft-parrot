@@ -38,6 +38,7 @@ public final class BehaviorStateMachine {
 		COMMAND_SCREAM,
 		COMMAND_LOVE,
 		COMMAND_EXP,
+		COMMAND_ROULETTE,
 		/** Достигнут радиус прибытия. */
 		ARRIVAL_REACHED,
 		/** Движение не завершилось за отведённое время. */
@@ -124,7 +125,7 @@ public final class BehaviorStateMachine {
 					: accepted(current, desired);
 
 			// Звук, сердечки и пузырёк опыта состояние не меняют.
-			case COMMAND_SCREAM, COMMAND_LOVE, COMMAND_EXP, COMMAND_HAT, COMMAND_DEHAT,
+			case COMMAND_SCREAM, COMMAND_LOVE, COMMAND_EXP, COMMAND_ROULETTE, COMMAND_HAT, COMMAND_DEHAT,
 					COMMAND_VIEW, COMMAND_DEVIEW -> accepted(current, desired);
 
 			case ARRIVAL_REACHED, MOVEMENT_TIMEOUT -> current == BehaviorState.RETURNING

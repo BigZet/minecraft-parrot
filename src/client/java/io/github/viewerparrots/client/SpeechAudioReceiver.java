@@ -39,6 +39,35 @@ public final class SpeechAudioReceiver {
 
     private SpeechAudioReceiver() { }
 
+    /** Explicit paid voice preview also works from the title screen, without a world or bird. */
+    public static void preview(byte[] pcm) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        client.execute(() -> {
+            if (pcm.length == 0 || pcm.length > SpeechAudioPayload.MAX_PCM_BYTES) return;
+            client.getSoundManager().play(new PreviewSound(pcm));
+        });
+    }
+
+    public static void stopAll() {
+        MinecraftClient client = MinecraftClient.getInstance();
+        client.getSoundManager().stopSounds(ViewerParrotsMod.id("parrot_speech"), null);
+        clear(client);
+    }
+
+    private static final class PreviewSound extends MovingSoundInstance {
+        private final PcmSpeechAudioStream stream;
+        private PreviewSound(byte[] pcm) {
+            super(SoundEvent.of(ViewerParrotsMod.id("parrot_speech")), SoundCategory.MASTER, SoundInstance.createRandom());
+            this.stream = new PcmSpeechAudioStream(new byte[][] {pcm});
+            this.relative = true;
+            this.attenuationType = SoundInstance.AttenuationType.NONE;
+        }
+        @Override public void tick() { }
+        @Override public CompletableFuture<AudioStream> getAudioStream(SoundLoader loader, Identifier id, boolean repeatInstantly) {
+            return CompletableFuture.completedFuture(stream);
+        }
+    }
+
     public static void register() {
         ClientPlayNetworking.registerGlobalReceiver(SpeechAudioPayload.ID,
                 (payload, context) -> receive(context.client(), payload));

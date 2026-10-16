@@ -110,13 +110,17 @@ class CommandResultCacheTest {
 	}
 
 	@Test
-	void evictingPendingResultReleasesItsCompletionFuture() {
+	void pendingResultSurvivesLongQueueAndTerminalCachePressure() {
 		UUID id = UUID.randomUUID();
 		cache.remember(new CommandResult(id, CommandStatus.ACCEPTED, null,
 				"viewerparrots.action.accepted", Map.of(), 0));
 		var completion = cache.completion(id);
 		for (int i = 0; i < CommandResultCache.MAX_ENTRIES; i++) cache.remember(result(UUID.randomUUID()));
-		assertEquals(CommandStatus.CANCELLED, completion.join().status());
+		clock.advanceTicks(CommandResultCache.TTL_TICKS + 100);
+		assertTrue(cache.find(id).isPresent());
+		org.junit.jupiter.api.Assertions.assertFalse(completion.isDone());
+		cache.remember(result(id));
+		assertTrue(completion.join().succeeded());
 		assertEquals(CommandResultCache.MAX_ENTRIES, cache.size());
 	}
 }

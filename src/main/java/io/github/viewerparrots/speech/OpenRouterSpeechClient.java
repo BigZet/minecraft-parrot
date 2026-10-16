@@ -42,11 +42,14 @@ public final class OpenRouterSpeechClient implements AutoCloseable {
 	}
 
 	public byte[] synthesize(String voiceId, String text) throws SpeechException {
+        return synthesize(voiceId, text, "elevenlabs/eleven-v4-turbo", 60);
+    }
+    public byte[] synthesize(String voiceId, String text, String model, int timeoutSeconds) throws SpeechException {
 		if (voiceId == null || voiceId.isBlank() || text == null || text.isBlank()) {
 			throw new SpeechException("Speech requires a voice and nonempty text.");
 		}
 		JsonObject body = new JsonObject();
-		body.addProperty("model", "elevenlabs/eleven-v4-turbo");
+		body.addProperty("model", model);
 		body.addProperty("input", text);
 		body.addProperty("voice", voiceId);
 		body.addProperty("response_format", "pcm");
@@ -59,13 +62,13 @@ public final class OpenRouterSpeechClient implements AutoCloseable {
 		body.add("provider", provider);
 		CompletableFuture<HttpResponse<byte[]>> pending = null;
 		try {
-			HttpRequest request = HttpRequest.newBuilder(ENDPOINT).timeout(Duration.ofSeconds(60))
+			HttpRequest request = HttpRequest.newBuilder(ENDPOINT).timeout(Duration.ofSeconds(timeoutSeconds))
 					.header("Authorization", "Bearer " + apiKey).header("Content-Type", "application/json")
 					.header("Accept", "audio/pcm")
 					.POST(HttpRequest.BodyPublishers.ofString(JSON.toJson(body), StandardCharsets.UTF_8)).build();
 			pending = transport.sendAsync(request, response -> new PcmBodySubscriber(response.statusCode()));
 			// Waiting for the bounded subscriber covers the body too, including a stalled stream.
-			return pending.get(60, TimeUnit.SECONDS).body();
+			return pending.get(timeoutSeconds, TimeUnit.SECONDS).body();
 		} catch (InterruptedException interrupted) {
 			Thread.currentThread().interrupt();
 			throw new SpeechException("Speech request was interrupted.");

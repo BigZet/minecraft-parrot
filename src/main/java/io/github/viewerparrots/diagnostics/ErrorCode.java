@@ -9,6 +9,11 @@ package io.github.viewerparrots.diagnostics;
  */
 public enum ErrorCode {
 	PERMISSION_DENIED,
+    COMMAND_DISABLED,
+    ROLE_NOT_ALLOWED,
+    VIEWER_BLOCKED,
+    VIEWER_MUTED,
+    SPEECH_LIMIT_REACHED,
 	INVALID_ARGUMENT,
 
 	VIEWER_NOT_FOUND,

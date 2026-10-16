@@ -59,6 +59,8 @@ public final class CommandFeedback {
 				case "viewerparrots.respawn.ok" -> "%s: respawned, generation %s";
 				case "viewerparrots.action.accepted" -> "%s: command %s accepted; awaiting completion";
 				case "viewerparrots.action.ok" -> "%s: command %s completed";
+				case "viewerparrots.roulette.queued" -> "%s: roulette queued";
+				case "viewerparrots.roulette.ok" -> "%s: won %s ×%s, dropped at the parrot's position";
 				case "viewerparrots.action.delayed" -> "%s: command %s delayed by LAZY for %s ticks";
 				case "viewerparrots.reload.ok" -> "Configuration reloaded";
 				case "viewerparrots.streamer.assigned" -> "Streamer assigned: %s";

@@ -183,6 +183,21 @@ class BehaviorStateMachineTest {
 	}
 
 	@Test
+	void roulettePreservesShoulderAndPendingMovementOrDance() {
+		for (var pair : new Object[][]{
+				{BehaviorState.SHOULDER, DesiredBehavior.FREEFOLLOW},
+				{BehaviorState.RETURNING, DesiredBehavior.SITTING},
+				{BehaviorState.DANCING, DesiredBehavior.FREE}}) {
+			BehaviorState current = (BehaviorState) pair[0];
+			DesiredBehavior desired = (DesiredBehavior) pair[1];
+			Accepted result = accepted(current, desired, Event.COMMAND_ROULETTE);
+			assertEquals(current, result.behavior());
+			assertEquals(desired, result.desiredBehavior());
+			assertTrue(result.cancellations().isEmpty());
+		}
+	}
+
+	@Test
 	@DisplayName("танец переживает выход стримера и завершается на месте")
 	void targetLossLetsDanceFinish() {
 		Accepted result = accepted(BehaviorState.DANCING, DesiredBehavior.IDLE, Event.TARGET_LOST);

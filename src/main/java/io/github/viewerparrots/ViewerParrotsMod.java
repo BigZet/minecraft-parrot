@@ -6,6 +6,7 @@ import io.github.viewerparrots.entity.ModEntities;
 import io.github.viewerparrots.diagnostics.AuditLog;
 import io.github.viewerparrots.network.ClientCompatibility;
 import io.github.viewerparrots.network.SpeechAudioPayload;
+import io.github.viewerparrots.network.RoulettePayload;
 import io.github.viewerparrots.service.ModSounds;
 import net.fabricmc.api.ModInitializer;
 import net.minecraft.util.Identifier;
@@ -27,9 +28,11 @@ public class ViewerParrotsMod implements ModInitializer {
 	@Override
 	public void onInitialize() {
 		long started = AuditLog.started();
+		io.github.viewerparrots.control.ControlPanelService.initialize(net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir());
 		ModEntities.register();
 		ModSounds.register();
 		SpeechAudioPayload.register();
+		RoulettePayload.register();
 		ClientCompatibility.register();
 		FabricLifecycleAdapter.register();
 		ViewerParrotCommands.register();

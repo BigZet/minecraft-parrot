@@ -1,10 +1,10 @@
 package io.github.viewerparrots.behavior.goal;
 
-import io.github.viewerparrots.behavior.BehaviorScheduler;
 import io.github.viewerparrots.behavior.ParrotRuntime;
 import io.github.viewerparrots.bootstrap.ServerContext;
 import io.github.viewerparrots.domain.BehaviorState;
 import io.github.viewerparrots.entity.ViewerParrotEntity;
+import io.github.viewerparrots.control.ControlPanelService;
 import net.minecraft.block.LeavesBlock;
 import net.minecraft.entity.ai.FuzzyTargeting;
 import net.minecraft.entity.ai.goal.FlyGoal;
@@ -82,8 +82,9 @@ public final class FreeFlightGoal extends FlyGoal {
 		if (runtime == null) return false;
 		if (runtime.behavior() != BehaviorState.FREEFOLLOW) return true;
 		ServerPlayerEntity target = context.streamerService().onlineTarget().orElse(null);
+		double radius = ControlPanelService.settings().active().gameplay().freefollowRadius();
 		return target == null || (parrot.getWorld().getRegistryKey().equals(target.getWorld().getRegistryKey())
-				&& destination.squaredDistanceTo(target.getPos()) <= BehaviorScheduler.FREE_FOLLOW_RADIUS * BehaviorScheduler.FREE_FOLLOW_RADIUS);
+				&& destination.squaredDistanceTo(target.getPos()) <= radius * radius);
 	}
 
 	private ParrotRuntime runtime(ServerContext context) {

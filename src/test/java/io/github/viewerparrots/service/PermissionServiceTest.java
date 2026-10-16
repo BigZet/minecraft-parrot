@@ -32,7 +32,7 @@ class PermissionServiceTest {
 	}
 
 	@ParameterizedTest
-	@EnumSource(value = ParrotAction.class, names = {"COME", "FOLLOW", "FREE", "FREEFOLLOW", "VIEW", "DEVIEW", "ARM", "DEARM", "SIT", "DANCE", "SCREAM", "INFO", "LIST", "HELP", "STREAMER"})
+	@EnumSource(value = ParrotAction.class, names = {"COME", "FOLLOW", "FREE", "FREEFOLLOW", "VIEW", "DEVIEW", "ARM", "DEARM", "SIT", "DANCE", "SCREAM", "ROULETTE", "INFO", "LIST", "HELP", "STREAMER"})
 	@DisplayName("control-уровень выполняет игровые команды")
 	void controlLevelRunsGameplay(ParrotAction action) {
 		assertTrue(DEFAULTS.isAllowed(playerAt(2), action));

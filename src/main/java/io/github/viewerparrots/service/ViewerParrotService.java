@@ -121,7 +121,22 @@ public final class ViewerParrotService {
 			auditOutcome(audit, denied, null);
 			return completed(denied);
 		}
-		return guarded(commandId, viewerId, audit, work);
+        var access = io.github.viewerparrots.settings.CommandAccess.evaluate(actor, action, viewerId);
+        if (!access.allowed()) return completed(CommandResult.rejected(commandId, io.github.viewerparrots.settings.CommandAccess.error(access)));
+        boolean newCreate = action == ParrotAction.CREATE && !this.operationResults.containsKey(commandId);
+        if (newCreate) {
+            long remaining = context.cooldowns().remainingTicks(viewerId, action);
+            if (remaining > 0) return completed(CommandResult.retryLater(commandId, ErrorCode.COMMAND_ON_COOLDOWN, remaining));
+            var budget = context.rateLimiter().check(action);
+            if (!budget.allowed()) return completed(CommandResult.retryLater(commandId, ErrorCode.GLOBAL_RATE_LIMITED, budget.retryAfterTicks()));
+        }
+        var result = guarded(commandId, viewerId, audit, work);
+        if (newCreate && !(result.isDone() && !result.isCompletedExceptionally()
+                && result.getNow(null).status() == CommandStatus.REJECTED)) {
+            context.cooldowns().consume(viewerId, action, access.cooldownTicks());
+            context.rateLimiter().tryAcquire(action);
+        }
+        return result;
 	}
 
 	private CompletableFuture<CommandResult> guarded(UUID commandId, ViewerId viewerId,

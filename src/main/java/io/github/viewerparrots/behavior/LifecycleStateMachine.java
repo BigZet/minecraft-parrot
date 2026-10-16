@@ -50,7 +50,7 @@ public final class LifecycleStateMachine {
 					ParrotAction.FREE, ParrotAction.FREEFOLLOW, ParrotAction.VIEW,
 					ParrotAction.DEVIEW, ParrotAction.ARM, ParrotAction.DEARM,
 					ParrotAction.DANCE, ParrotAction.SPIN, ParrotAction.HAT, ParrotAction.DEHAT,
-					ParrotAction.SCREAM, ParrotAction.LOVE, ParrotAction.EXP),
+					ParrotAction.SCREAM, ParrotAction.LOVE, ParrotAction.EXP, ParrotAction.ROULETTE),
 			LifecycleState.UNLOADED, EnumSet.of(
 					ParrotAction.INFO, ParrotAction.REMOVE, ParrotAction.RECONCILE,
 					ParrotAction.RENAME, ParrotAction.TRAIT, ParrotAction.COME),

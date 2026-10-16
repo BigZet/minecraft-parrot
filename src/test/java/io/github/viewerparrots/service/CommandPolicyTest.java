@@ -40,4 +40,13 @@ class CommandPolicyTest {
         assertFalse(CommandPolicy.shouldDelay(true, ParrotTrait.LAZY, ParrotAction.FREE));
         assertFalse(CommandPolicy.shouldDelay(true, ParrotTrait.LAZY, ParrotAction.FREEFOLLOW));
     }
+
+    @Test void rouletteLeavesShoulderAndLazyMovementIntact() {
+        assertFalse(CommandPolicy.releasesShoulder(ParrotAction.ROULETTE));
+        assertTrue(CommandPolicy.preservesBehavior(ParrotAction.ROULETTE));
+        assertFalse(CommandPolicy.shouldDelay(true, ParrotTrait.LAZY, ParrotAction.ROULETTE));
+        assertTrue(ParrotAction.ROULETTE.countsTowardActionBudget());
+        assertFalse(ParrotAction.ROULETTE.countsTowardSoundBudget());
+        assertTrue(ParrotAction.ROULETTE.hasCooldown());
+    }
 }

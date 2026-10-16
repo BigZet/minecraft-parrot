@@ -157,6 +157,7 @@ public final class ViewerParrotCommands {
 				.then(gameAction("hat", ParrotAction.HAT))
 				.then(gameAction("dehat", ParrotAction.DEHAT))
 				.then(gameAction("exp", ParrotAction.EXP))
+				.then(gameAction("roulette", ParrotAction.ROULETTE))
 
 				.then(CommandManager.literal("save")
 						.requires(source -> allowed(source, ParrotAction.SAVE))
@@ -252,6 +253,7 @@ public final class ViewerParrotCommands {
 				/viewerparrot spin <viewerId> (spin in place for 3 seconds; 5-second cooldown)
 				/viewerparrot hat <viewerId> | dehat <viewerId> (random different hat / remove; 2-second cooldown)
 				/viewerparrot say <viewerId> <text> (first 30 words; 2-second cooldown)
+				/viewerparrot roulette <viewerId> (4-second spin + 2-second result; prize drops at parrot; 60-second cooldown)
 				Alias: /vp. Names may contain spaces; quote viewer IDs containing ':'.""";
 		String admin = allowed(source, ParrotAction.CREATE) ? "\n" + """
 				/viewerparrot setstreamer <player>

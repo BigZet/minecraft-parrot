@@ -2,6 +2,8 @@ package io.github.viewerparrots.twitch;
 
 import io.github.viewerparrots.api.ActionParameters;
 import io.github.viewerparrots.api.ParrotAction;
+import io.github.viewerparrots.settings.TwitchRole;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -50,6 +52,24 @@ class TwitchCommandInboxTest {
         assertTrue(inbox.poll().isEmpty());
     }
 
+    @Test void queuesRolesWithTheirOwnRequestAndKeepsLegacyPollOnTheSameQueue() {
+        var inbox = new TwitchCommandInbox("streamer", 2);
+        inbox.setAccepting(true);
+        var moderator = TwitchIrcParser.parse("@user-id=42;mod=1;id=moderator-message "
+                + ":moderator!moderator@host PRIVMSG #streamer :!sit").orElseThrow();
+        assertTrue(inbox.offer(moderator));
+        assertTrue(inbox.offer(message("99", "!follow", "ordinary-message")));
+
+        var entry = inbox.pollEntry().orElseThrow();
+
+        assertEquals("twitch:42", entry.request().viewerId().value());
+        assertEquals(ParrotAction.SIT, entry.request().action());
+        assertEquals(Set.of(TwitchRole.EVERYONE, TwitchRole.MODERATOR), entry.roles());
+        assertThrows(UnsupportedOperationException.class, () -> entry.roles().add(TwitchRole.BROADCASTER));
+        assertEquals("twitch:99", inbox.poll().orElseThrow().viewerId().value());
+        assertTrue(inbox.pollEntry().isEmpty());
+    }
+
     @Test void speechUsesSenderIdentityAndPreservesBodyCase() {
         var request = TwitchCommandInbox.command(message("123", "!SaY twitch:999 Hello МИР", "speech"), "streamer").orElseThrow();
         assertEquals("twitch:123", request.viewerId().value());
@@ -94,5 +114,14 @@ class TwitchCommandInboxTest {
             assertSame(ActionParameters.None.INSTANCE, request.parameters());
             assertTrue(TwitchCommandInbox.command(message("789", "!" + name + " twitch:999", "foreign-" + name), "streamer").isEmpty());
         }
+    }
+
+    @Test void rouletteUsesItsSenderAndRejectsArgumentsOrLookalikeCommands() {
+        var request = TwitchCommandInbox.command(message("456", "  !RoUlEtTe  ", "roulette"), "streamer").orElseThrow();
+        assertEquals(ParrotAction.ROULETTE, request.action());
+        assertEquals("twitch:456", request.viewerId().value());
+        assertSame(ActionParameters.None.INSTANCE, request.parameters());
+        for (String text : new String[]{"!roulette twitch:999", "!roulette diamond", "!roulettes", "!rouletteNow"})
+            assertTrue(TwitchCommandInbox.command(message("456", text, "bad-roulette"), "streamer").isEmpty());
     }
 }

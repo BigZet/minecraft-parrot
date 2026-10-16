@@ -30,6 +30,7 @@ public enum ParrotAction {
 	HAT(Access.CONTROL, Category.GAME),
 	DEHAT(Access.CONTROL, Category.GAME),
 	EXP(Access.CONTROL, Category.GAME),
+	ROULETTE(Access.CONTROL, Category.GAME),
 
 	// --- admin level (раздел 12) ---
 	CREATE(Access.ADMIN, Category.MUTATION),
@@ -98,7 +99,7 @@ public enum ParrotAction {
 	/** Действия, у которых есть собственный cooldown по viewerId + action (раздел 7 ТЗ). */
 	public boolean hasCooldown() {
 		return switch (this) {
-			case COME, FOLLOW, FREE, FREEFOLLOW, VIEW, DEVIEW, ARM, DEARM, SIT, DANCE, SPIN, SCREAM, SAY, LOVE, HAT, DEHAT, EXP, RESPAWN -> true;
+			case COME, FOLLOW, FREE, FREEFOLLOW, VIEW, DEVIEW, ARM, DEARM, SIT, DANCE, SPIN, SCREAM, SAY, LOVE, HAT, DEHAT, EXP, ROULETTE, RESPAWN -> true;
 			default -> false;
 		};
 	}

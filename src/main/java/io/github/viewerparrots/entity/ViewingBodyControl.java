@@ -1,6 +1,7 @@
 package io.github.viewerparrots.entity;
 
 import io.github.viewerparrots.behavior.ViewTrackingPolicy;
+import io.github.viewerparrots.control.ControlPanelService;
 import net.minecraft.entity.ai.control.BodyControl;
 import net.minecraft.entity.ai.control.LookControl;
 import net.minecraft.util.math.MathHelper;
@@ -15,11 +16,12 @@ final class ViewingBodyControl extends BodyControl {
     }
 
     @Override public void tick() {
+        var gameplay = ControlPanelService.settings().active().gameplay();
         if (parrot.isViewingStreamer() && !parrot.isSpinning() && parrot.getWorld().isClient()) {
             // The LOOK goal runs only on the server. Preserve its separately synchronized body yaw;
             // vanilla's idle client controller would otherwise align the whole body with the head.
             parrot.bodyYaw = parrot.getYaw();
-            parrot.headYaw = MathHelper.clampAngle(parrot.headYaw, parrot.bodyYaw, ViewTrackingPolicy.MAX_HEAD_YAW);
+            parrot.headYaw = MathHelper.clampAngle(parrot.headYaw, parrot.bodyYaw, gameplay.headMaxAngle());
             return;
         }
         double dx = parrot.getX() - parrot.prevX;
@@ -31,8 +33,9 @@ final class ViewingBodyControl extends BodyControl {
         double targetZ = look.getLookZ() - parrot.getZ();
         if (targetX * targetX + targetZ * targetZ < 1.0E-10) return;
         float targetYaw = (float) (MathHelper.atan2(targetZ, targetX) * 180 / Math.PI) - 90;
-        parrot.bodyYaw = ViewTrackingPolicy.bodyYaw(parrot.bodyYaw, parrot.headYaw, targetYaw);
+        parrot.bodyYaw = ViewTrackingPolicy.bodyYaw(parrot.bodyYaw, parrot.headYaw, targetYaw,
+                gameplay.headMaxAngle(), gameplay.headTurnThreshold());
         parrot.setYaw(parrot.bodyYaw);
-        parrot.headYaw = MathHelper.clampAngle(parrot.headYaw, parrot.bodyYaw, ViewTrackingPolicy.MAX_HEAD_YAW);
+        parrot.headYaw = MathHelper.clampAngle(parrot.headYaw, parrot.bodyYaw, gameplay.headMaxAngle());
     }
 }

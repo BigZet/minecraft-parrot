@@ -23,17 +23,18 @@ class VoiceAssignmentsTest {
 	Path directory;
 
 	@Test
-	void usesAllTwelveVoicesBeforeSharingThenKeepsUsageBalanced() {
+	void usesEveryVoiceBeforeSharingThenKeepsUsageBalanced() {
 		VoiceAssignments voices = new VoiceAssignments(VoiceAssignments.DEFAULT_VOICES, new Random(42));
-		Set<String> firstTwelve = new HashSet<>();
-		for (int i = 0; i < 12; i++) {
-			firstTwelve.add(voices.assign(new UUID(0, i)));
+		int poolSize = VoiceAssignments.DEFAULT_VOICES.size();
+		Set<String> firstAssignments = new HashSet<>();
+		for (int i = 0; i < poolSize; i++) {
+			firstAssignments.add(voices.assign(new UUID(0, i)));
 		}
-		assertEquals(12, firstTwelve.size());
-		for (int i = 12; i < 36; i++) {
+		assertEquals(Set.copyOf(VoiceAssignments.DEFAULT_VOICES), firstAssignments);
+		for (int i = poolSize; i < poolSize * 3; i++) {
 			voices.assign(new UUID(0, i));
 		}
-		for (String voice : firstTwelve) {
+		for (String voice : firstAssignments) {
 			assertEquals(3, voices.snapshot().values().stream().filter(voice::equals).count());
 		}
 	}
@@ -88,13 +89,54 @@ class VoiceAssignmentsTest {
 	}
 
 	@Test
-	void rejectsUnknownRestoredVoicesWithoutReplacingCurrentAssignments() {
+	void restoresExistingBirdVoiceEvenWhenItIsOutsideTheCurrentProfilePool() {
 		UUID first = new UUID(0, 1);
 		VoiceAssignments voices = new VoiceAssignments(List.of("A"), new Random(42));
-		voices.assign(first);
-		assertThrows(IllegalArgumentException.class, () -> voices.restore(Map.of(first, "unknown")));
-		assertEquals(Map.of(first, "A"), voices.snapshot());
+		voices.restore(Map.of(first, "retiredVoice"));
+		assertEquals("retiredVoice", voices.assign(first));
+		assertEquals("A", voices.assign(new UUID(0, 2)));
+		assertThrows(IllegalArgumentException.class, () -> voices.restore(Map.of(first, " ")));
+		assertEquals("retiredVoice", voices.assign(first));
 		assertThrows(IllegalArgumentException.class, () -> new VoiceAssignments(List.of(), new Random()));
 		assertThrows(IllegalArgumentException.class, () -> new VoiceAssignments(List.of("A", "A"), new Random()));
+	}
+
+	@Test
+	void excludingAVoiceOnlyChangesFutureAssignments() {
+		UUID first = new UUID(0, 1);
+		VoiceAssignments voices = new VoiceAssignments(List.of("A"), new Random(42));
+		assertEquals("A", voices.assign(first));
+		voices.updatePool(List.of("B", "C"));
+		assertEquals("A", voices.assign(first));
+		String second = voices.assign(new UUID(0, 2));
+		String third = voices.assign(new UUID(0, 3));
+		assertTrue(Set.of("B", "C").contains(second));
+		assertTrue(Set.of("B", "C").contains(third));
+		assertFalse(second.equals(third));
+	}
+
+	@Test
+	void aNewlyEnabledVoiceReceivesAssignmentsUntilItsUsageCatchesUp() {
+		VoiceAssignments voices = new VoiceAssignments(List.of("A", "B"), new Random(42));
+		voices.restore(Map.of(new UUID(0, 1), "A", new UUID(0, 2), "A", new UUID(0, 3), "B"));
+		voices.updatePool(List.of("B", "C"));
+		assertEquals("C", voices.assign(new UUID(0, 4)));
+		assertEquals("A", voices.assign(new UUID(0, 1)));
+		assertThrows(IllegalArgumentException.class, () -> voices.updatePool(List.of("B", "B")));
+	}
+
+	@Test
+	void explicitVoiceSelectionAndRetiredAssignmentsSurviveSaving() throws Exception {
+		UUID first = new UUID(0, 1);
+		VoiceAssignments voices = new VoiceAssignments(List.of("A", "B"), new Random(42));
+		voices.setVoice(first, "B");
+		assertEquals("B", voices.assign(first));
+		voices.updatePool(List.of("A"));
+		Path path = directory.resolve("voices.json");
+		VoiceAssignments.write(path, voices.snapshot());
+		VoiceAssignments restored = new VoiceAssignments(List.of("A"), new Random(42));
+		restored.restore(VoiceAssignments.read(path));
+		assertEquals("B", restored.assign(first));
+		assertEquals("A", restored.assign(new UUID(0, 2)));
 	}
 }

@@ -2,6 +2,7 @@ package io.github.viewerparrots.client;
 
 import io.github.viewerparrots.ViewerParrotsMod;
 import io.github.viewerparrots.entity.ModEntities;
+import io.github.viewerparrots.client.menu.ControlPanelClient;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.LivingEntityFeatureRendererRegistrationCallback;
@@ -14,8 +15,10 @@ import net.minecraft.client.render.entity.PlayerEntityRenderer;
 public class ViewerParrotsClient implements ClientModInitializer {
 	@Override
 	public void onInitializeClient() {
+		ControlPanelClient.register();
 		ClientCompatibilityReceiver.register();
 		SpeechAudioReceiver.register();
+		RouletteRenderer.register();
 		EntityRendererRegistry.register(ModEntities.VIEWER_PARROT, ViewerParrotRenderer::new);
 		LivingEntityFeatureRendererRegistrationCallback.EVENT.register((type, renderer, helper, context) -> {
 			if (renderer instanceof PlayerEntityRenderer playerRenderer)

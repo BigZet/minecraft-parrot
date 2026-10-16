@@ -1,6 +1,7 @@
 package io.github.viewerparrots.entity;
 
 import io.github.viewerparrots.behavior.ViewTrackingPolicy;
+import io.github.viewerparrots.control.ControlPanelService;
 import net.minecraft.entity.ai.control.LookControl;
 import net.minecraft.util.math.MathHelper;
 
@@ -26,6 +27,7 @@ final class ViewingLookControl extends LookControl {
 
     @Override protected void clampHeadYaw() {
         if (!parrot.isViewingStreamer()) { super.clampHeadYaw(); return; }
-        parrot.headYaw = MathHelper.clampAngle(parrot.headYaw, parrot.bodyYaw, ViewTrackingPolicy.MAX_HEAD_YAW);
+        parrot.headYaw = MathHelper.clampAngle(parrot.headYaw, parrot.bodyYaw,
+                ControlPanelService.settings().active().gameplay().headMaxAngle());
     }
 }

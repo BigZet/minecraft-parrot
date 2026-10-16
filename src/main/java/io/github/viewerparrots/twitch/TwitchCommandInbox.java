@@ -5,11 +5,14 @@ import io.github.viewerparrots.api.CommandRequest;
 import io.github.viewerparrots.api.ParrotAction;
 import io.github.viewerparrots.domain.DisplayName;
 import io.github.viewerparrots.domain.ViewerId;
+import io.github.viewerparrots.settings.TwitchRole;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.LinkedHashSet;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -18,7 +21,7 @@ public final class TwitchCommandInbox {
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CHARACTER_CLASS);
     private final String channel;
     private final int capacity;
-    private final ArrayDeque<CommandRequest> queue = new ArrayDeque<>();
+    private final ArrayDeque<Entry> queue = new ArrayDeque<>();
     private final LinkedHashSet<String> seen = new LinkedHashSet<>();
     private boolean accepting;
 
@@ -52,6 +55,7 @@ public final class TwitchCommandInbox {
             case "!hat" -> ParrotAction.HAT;
             case "!dehat" -> ParrotAction.DEHAT;
             case "!exp" -> ParrotAction.EXP;
+            case "!roulette" -> ParrotAction.ROULETTE;
             default -> null;
         };
         if (action == null) return Optional.empty();
@@ -81,11 +85,19 @@ public final class TwitchCommandInbox {
             if (!seen.add(id)) return false;
             if (seen.size() > 512) seen.remove(seen.iterator().next());
         }
-        queue.addLast(request.get());
+        queue.addLast(new Entry(request.get(), message.roles()));
         return true;
     }
 
-    public synchronized Optional<CommandRequest> poll() { return Optional.ofNullable(queue.pollFirst()); }
+    public synchronized Optional<Entry> pollEntry() { return Optional.ofNullable(queue.pollFirst()); }
+    public synchronized Optional<CommandRequest> poll() { return pollEntry().map(Entry::request); }
     public synchronized int pending() { return queue.size(); }
     public synchronized void discardPending() { queue.clear(); }
+
+    public record Entry(CommandRequest request, Set<TwitchRole> roles) {
+        public Entry {
+            Objects.requireNonNull(request, "request");
+            roles = Set.copyOf(roles);
+        }
+    }
 }

@@ -12,10 +12,15 @@ public final class SpeechText {
 	private SpeechText() { }
 
 	public static String firstThirtyWords(String text) {
-		Matcher words = WORD.matcher(Objects.requireNonNull(text, "text"));
+		return firstWords(text, 30);
+	}
+	public static int wordCount(String text) { return (int) WORD.matcher(text).results().count(); }
+	public static String firstWords(String text, int limit) {
+        if (limit < 1) throw new IllegalArgumentException("word limit");
+        Matcher words = WORD.matcher(Objects.requireNonNull(text, "text"));
 		StringJoiner result = new StringJoiner(" ");
 		int count = 0;
-		while (count < 30 && words.find()) {
+		while (count < limit && words.find()) {
 			result.add(words.group());
 			count++;
 		}

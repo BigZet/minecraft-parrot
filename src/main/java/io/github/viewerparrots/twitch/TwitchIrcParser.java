@@ -1,11 +1,14 @@
 package io.github.viewerparrots.twitch;
 
+import io.github.viewerparrots.settings.TwitchRole;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /** Parses only tagged user chat messages; other IRC traffic is ignored. */
 public final class TwitchIrcParser {
@@ -34,8 +37,27 @@ public final class TwitchIrcParser {
 			}
 			return Optional.of(new TwitchChatMessage(channel.substring(1).toLowerCase(Locale.ROOT),
 					userId, displayName, message.parameters().get(1),
-					message.tags().getOrDefault("id", "")));
+					message.tags().getOrDefault("id", ""), roles(message.tags())));
 		});
+	}
+
+	private static Set<TwitchRole> roles(Map<String, String> tags) {
+		Set<TwitchRole> roles = EnumSet.of(TwitchRole.EVERYONE);
+		if ("1".equals(tags.get("mod"))) roles.add(TwitchRole.MODERATOR);
+		if ("1".equals(tags.get("subscriber"))) roles.add(TwitchRole.SUBSCRIBER);
+		for (String badge : tags.getOrDefault("badges", "").split(",")) {
+			int separator = badge.indexOf('/');
+			if (separator < 1 || !badge.substring(separator + 1).matches("[0-9]+")) continue;
+			TwitchRole role = switch (badge.substring(0, separator)) {
+				case "broadcaster" -> TwitchRole.BROADCASTER;
+				case "moderator" -> TwitchRole.MODERATOR;
+				case "vip" -> TwitchRole.VIP;
+				case "subscriber", "founder" -> TwitchRole.SUBSCRIBER;
+				default -> null;
+			};
+			if (role != null) roles.add(role);
+		}
+		return roles;
 	}
 
 	/** Shared IRC framing for chat, keepalive and connection status messages. */

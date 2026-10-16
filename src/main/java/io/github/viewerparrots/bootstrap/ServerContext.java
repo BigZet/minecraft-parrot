@@ -30,6 +30,9 @@ import io.github.viewerparrots.service.SoundService;
 import io.github.viewerparrots.service.StreamerService;
 import io.github.viewerparrots.service.ViewerParrotService;
 import io.github.viewerparrots.speech.ParrotSpeechService;
+import io.github.viewerparrots.roulette.RouletteService;
+import io.github.viewerparrots.roulette.RouletteSettings;
+import io.github.viewerparrots.roulette.RouletteSettingsLoader;
 import io.github.viewerparrots.storage.JsonParrotRepository;
 import io.github.viewerparrots.storage.ParrotRepository;
 import io.github.viewerparrots.time.GameClock;
@@ -74,7 +77,9 @@ public final class ServerContext {
 		DEGRADED
 	}
 
-	private static ServerContext current;
+	private static volatile ServerContext current;
+	private io.github.viewerparrots.settings.ModSettings.Profile initialProfile;
+	private boolean settingsRestartRequired;
 
 	private final MinecraftServer server;
 	private final GameClock clock;
@@ -96,6 +101,7 @@ public final class ServerContext {
 	private ParrotCommandService commandService;
 	private SoundService soundService;
 	private ParrotSpeechService speechService;
+	private RouletteService rouletteService;
 	private BehaviorScheduler behaviorScheduler;
 	private DefaultViewerParrotApi api;
 
@@ -179,6 +185,7 @@ public final class ServerContext {
 		this.recoveryService = new EntityRecoveryService(this);
 		this.soundService = new SoundService(this.config, this.behaviorRandom);
 		this.speechService = new ParrotSpeechService(this, FabricLoader.getInstance().getConfigDir());
+		this.rouletteService = new RouletteService(this);
 		this.commandService = new ParrotCommandService(this);
 		this.behaviorScheduler = new BehaviorScheduler(this);
 		this.api = new DefaultViewerParrotApi(this);
@@ -193,7 +200,16 @@ public final class ServerContext {
 		ConfigLoader loader = configReader();
 		JsonParrotRepository files = this.repository;
 		boolean[] configurationLoaded = {false};
-		this.writer.submit(() -> loader.loadOrCreate(configPath)).thenCompose(candidate -> {
+		this.writer.submit(() -> {
+            io.github.viewerparrots.control.ControlPanelService.ready().join();
+            if (!io.github.viewerparrots.control.ControlPanelService.configurationValid())
+                throw new IOException(io.github.viewerparrots.control.ControlPanelService.settingsError());
+            return io.github.viewerparrots.control.ControlPanelService.settings().active();
+        }).thenCompose(profile -> {
+            var candidate = profile.general();
+            this.initialProfile = profile;
+            this.speechService.initializeSettings(profile.speech());
+            this.rouletteService.installSettings(profile.roulette());
 			if (!isActiveContext()) return CompletableFuture.failedFuture(new CancellationException("context stopped during configuration read"));
 			installConfiguration(candidate, false);
 			this.writer.configureQueueCapacity(candidate.limits().queueCapacity());
@@ -243,6 +259,7 @@ public final class ServerContext {
 
 	public void forgetRuntime(ViewerId viewerId) {
 		if (this.commandService != null) this.commandService.cancelRuntime(viewerId, ErrorCode.INVALID_STATE);
+		if (this.rouletteService != null) this.rouletteService.cancel(viewerId);
 		this.runtimes.remove(viewerId);
 	}
 
@@ -267,22 +284,38 @@ public final class ServerContext {
 		if (this.storageHealth == StorageHealth.LOADING) return CompletableFuture.completedFuture(CommandResult.rejected(commandId, ErrorCode.STORAGE_UNAVAILABLE));
 		if (this.reloadPending) return CompletableFuture.completedFuture(CommandResult.rejected(commandId, ErrorCode.OPERATION_PENDING));
 		if (this.writer.queueDepth() >= this.config.limits().queueCapacity()) return CompletableFuture.completedFuture(CommandResult.rejected(commandId, ErrorCode.SERVER_BUSY));
-		Path path = configFile();
-		ConfigLoader loader = configReader();
-		this.reloadPending = true;
-		return this.writer.submit(() -> loader.loadOrCreate(path)).handle((candidate, error) -> {
-			this.reloadPending = false;
-			if (!isActiveContext()) return CommandResult.rejected(commandId, ErrorCode.INVALID_STATE);
-			if (error != null) {
-				AuditLog.warn("config_reload", AuditLog.Context.viewer(commandId, null, "RELOAD"), "REJECTED", "CONFIG_INVALID", started, Map.of(), error);
-				return CommandResult.rejected(commandId, ErrorCode.CONFIG_INVALID, CommandResult.details("detail", AuditLog.safeText(error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage())));
-			}
-			if (candidate.requiresRestartComparedTo(this.config)) return CommandResult.rejected(commandId, ErrorCode.CONFIG_RESTART_REQUIRED);
-			installConfiguration(candidate, true);
-			AuditLog.info("config_reload", AuditLog.Context.viewer(commandId, null, "RELOAD"), "SUCCEEDED", null, started, Map.of("deathMode", candidate.deathMode(), "behaviorEnabled", candidate.behavior().enabled()), null);
-			return CommandResult.succeeded(commandId, "viewerparrots.reload.ok", Map.of());
-		});
-	}
+        this.reloadPending = true;
+        return io.github.viewerparrots.control.ControlPanelService.reload().handle((loaded, error) -> {
+            this.reloadPending = false;
+            if (error != null) return CommandResult.rejected(commandId, ErrorCode.CONFIG_INVALID);
+            return CommandResult.succeeded(commandId, this.settingsRestartRequired
+                    ? "viewerparrots.reload.pending_restart" : "viewerparrots.reload.ok", Map.of());
+        });
+    }
+
+    /** Preserve cold worker/storage settings while applying all hot settings on the paused server too. */
+    public boolean applySettings(io.github.viewerparrots.settings.ModSettings.Profile profile) {
+        if (!server.isOnThread()) throw new IllegalStateException("settings must apply on server thread");
+        if (initialProfile == null) return false;
+        var requested = profile.general(); var cold = initialProfile.general();
+        settingsRestartRequired = requested.requiresRestartComparedTo(cold)
+                || profile.speech().queueCapacity() != initialProfile.speech().queueCapacity()
+                || profile.moderation().twitchQueueCapacity() != initialProfile.moderation().twitchQueueCapacity()
+                || profile.roulette().queueCapacity() != initialProfile.roulette().queueCapacity();
+        var hot = new ViewerParrotsConfig(requested.schemaVersion(), requested.maxActiveParrots(), requested.deathMode(),
+                requested.nameFormat(), requested.nameVisible(), requested.permissions(), requested.come(), requested.follow(),
+                requested.dance(), requested.cooldowns(), requested.sound(), requested.behavior(),
+                new ViewerParrotsConfig.Limits(requested.limits().actionsPer20Ticks(), requested.limits().soundsPer20Ticks(), cold.limits().queueCapacity()),
+                new ViewerParrotsConfig.Recovery(cold.recovery().maxConcurrentJobs(), requested.recovery().timeoutTicks()), cold.storage());
+        installConfiguration(hot, true);
+        speechService.applySettings(profile.speech());
+        var roulette = profile.roulette();
+        rouletteService.installSettings(new RouletteSettings(roulette.durationTicks(), roulette.resultTicks(), roulette.cooldownTicks(),
+                initialProfile.roulette().queueCapacity(), roulette.categories()));
+        return settingsRestartRequired;
+    }
+    public boolean settingsRestartRequired() { return settingsRestartRequired; }
+    public int twitchQueueCapacity() { return initialProfile == null ? 256 : initialProfile.moderation().twitchQueueCapacity(); }
 
 	private void installConfiguration(ViewerParrotsConfig candidate, boolean reload) {
 			PermissionService nextPermissions = new PermissionService(candidate.permissions().controlLevel(), candidate.permissions().adminLevel());
@@ -393,6 +426,7 @@ public final class ServerContext {
 		long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(this.config.storage().shutdownTimeoutSeconds());
 		this.recoveryService.cancelAll();
 		this.speechService.close();
+		this.rouletteService.close();
 		CheckpointScheduler.saveOnShutdown(this);
 		this.commandService.clear();
 		this.api.clear();
@@ -503,6 +537,7 @@ public final class ServerContext {
 	}
 
 	public ParrotSpeechService speechService() { return this.speechService; }
+	public RouletteService rouletteService() { return this.rouletteService; }
 
 	public EventDispatcher events() {
 		return this.events;

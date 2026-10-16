@@ -35,3 +35,10 @@ logs/
 .env
 .env.*
 *.dpapi
+
+# Instance settings and encrypted/fallback credential storage
+**/config/viewerparrots-settings.json*
+**/config/viewerparrots-usage.json*
+**/config/viewerparrots-profiles/
+viewerparrots-*.credentials
+**/.viewerparrots-*.tmp

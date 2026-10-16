@@ -62,6 +62,15 @@ public final class ParrotCommandService {
     public CommandResultCache resultCache() { return this.resultCache; }
     public CompletableFuture<CommandResult> completion(UUID commandId) { return this.resultCache.completion(commandId); }
 
+    /** Roulette completion is independent of movement and never replaces the bird's intent. */
+    public void finishRoulette(ViewerId viewerId, CommandResult result) {
+        if (!result.status().isTerminal()) throw new IllegalArgumentException("Expected final roulette result");
+        if (this.resultCache.find(result.commandId()).filter(cached -> cached.status() == CommandStatus.ACCEPTED).isEmpty()) return;
+        this.resultCache.remember(result);
+        publishCurrent(ParrotEvent.Type.COMMAND_COMPLETED, viewerId, result.commandId(), null,
+                ParrotAction.ROULETTE.name(), result.code() == null ? null : result.code().name());
+    }
+
     public CommandResult submit(UUID commandId, ActorContext actor, ParrotAction action, ViewerId viewerId) {
         Objects.requireNonNull(commandId, "commandId");
         Objects.requireNonNull(actor, "actor");
@@ -86,8 +95,11 @@ public final class ParrotCommandService {
             return cached.get();
         }
 
+        var access = io.github.viewerparrots.settings.CommandAccess.evaluate(actor, action, viewerId);
+        if (!access.allowed()) return reject(commandId, viewerId, action, io.github.viewerparrots.settings.CommandAccess.error(access));
+        if (!resultCache.hasCapacity()) return reject(commandId, viewerId, action, ErrorCode.SERVER_BUSY);
         CommandResult result;
-        try { result = evaluate(commandId, action, viewerId, started); }
+        try { result = evaluate(commandId, action, viewerId, started, access.cooldownTicks()); }
         catch (RuntimeException error) {
             AuditLog.error("command_failed", identity, "FAILED", ErrorCode.INTERNAL_ERROR.name(), started, Map.of(), error);
             throw error;
@@ -107,7 +119,7 @@ public final class ParrotCommandService {
         return CommandResult.rejected(commandId, code);
     }
 
-    private CommandResult evaluate(UUID commandId, ParrotAction action, ViewerId viewerId, long started) {
+    private CommandResult evaluate(UUID commandId, ParrotAction action, ViewerId viewerId, long started, int effectiveCooldown) {
         Optional<ViewerParrotRecord> maybeRecord = this.context.registry().find(viewerId);
         if (maybeRecord.isEmpty()) return CommandResult.rejected(commandId, ErrorCode.VIEWER_NOT_FOUND);
         ViewerParrotRecord record = maybeRecord.get();
@@ -152,6 +164,18 @@ public final class ParrotCommandService {
         long remaining = this.context.cooldowns().remainingTicks(viewerId, cooldownKey(action));
         if (remaining > 0) return CommandResult.retryLater(commandId, ErrorCode.COMMAND_ON_COOLDOWN, remaining);
 
+        if (action == ParrotAction.ROULETTE) {
+            ErrorCode error = this.context.rouletteService().enqueue(commandId, record, parrot);
+            if (error != null) return CommandResult.rejected(commandId, error);
+            this.context.rateLimiter().tryAcquire(action);
+            this.context.cooldowns().consume(viewerId, action, effectiveCooldown);
+            CommandResult queued = new CommandResult(commandId, CommandStatus.ACCEPTED, null,
+                    "viewerparrots.roulette.queued", CommandResult.details("viewerId", viewerId.value()), 0);
+            this.resultCache.remember(queued);
+            publishCurrent(ParrotEvent.Type.COMMAND_ACCEPTED, viewerId, commandId, null, action.name(), null);
+            return queued;
+        }
+
         // A failed mount must leave the old movement/intent intact and consume no cooldown.
         if (action == ParrotAction.ARM) {
             ErrorCode error = this.context.shoulderService().arm(parrot,
@@ -173,7 +197,7 @@ public final class ParrotCommandService {
         this.context.rateLimiter().tryAcquire(action);
         java.util.List<UUID> displaced = preservesBehavior(action)
                 ? java.util.List.of() : prepareCancellation(runtime);
-        this.context.cooldowns().consume(viewerId, cooldownKey(action), cooldownFor(action));
+        this.context.cooldowns().consume(viewerId, cooldownKey(action), effectiveCooldown);
         PendingCommand pending = new PendingCommand(record, action, started);
         pending.displacedCommands = displaced;
         this.pendingCommands.put(commandId, pending);
@@ -429,9 +453,9 @@ public final class ParrotCommandService {
         return new CommandResult(id, CommandStatus.ACCEPTED, null, key, details, 0);
     }
 
-    private static boolean requiresTarget(ParrotAction action) { return action == ParrotAction.COME || action == ParrotAction.FOLLOW || action == ParrotAction.FREEFOLLOW || action == ParrotAction.ARM || action == ParrotAction.VIEW; }
+    private static boolean requiresTarget(ParrotAction action) { return action == ParrotAction.COME || action == ParrotAction.FOLLOW || action == ParrotAction.FREEFOLLOW || action == ParrotAction.ARM || action == ParrotAction.VIEW || action == ParrotAction.ROULETTE; }
     private static boolean preservesBehavior(ParrotAction action) { return CommandPolicy.preservesBehavior(action); }
-    private static boolean isGameAction(ParrotAction action) { return switch (action) { case COME, FOLLOW, FREE, FREEFOLLOW, VIEW, DEVIEW, ARM, DEARM, SIT, DANCE, SPIN, HAT, DEHAT, SCREAM, LOVE, EXP -> true; default -> false; }; }
+    private static boolean isGameAction(ParrotAction action) { return switch (action) { case COME, FOLLOW, FREE, FREEFOLLOW, VIEW, DEVIEW, ARM, DEARM, SIT, DANCE, SPIN, HAT, DEHAT, SCREAM, LOVE, EXP, ROULETTE -> true; default -> false; }; }
     private static ParrotAction cooldownKey(ParrotAction action) { return CommandPolicy.cooldownKey(action); }
     private static BehaviorStateMachine.Event toEvent(ParrotAction action) {
         return switch (action) {
@@ -451,6 +475,7 @@ public final class ParrotCommandService {
             case SCREAM -> BehaviorStateMachine.Event.COMMAND_SCREAM;
             case LOVE -> BehaviorStateMachine.Event.COMMAND_LOVE;
             case EXP -> BehaviorStateMachine.Event.COMMAND_EXP;
+            case ROULETTE -> BehaviorStateMachine.Event.COMMAND_ROULETTE;
             default -> throw new IllegalArgumentException("not a game action: " + action);
         };
     }

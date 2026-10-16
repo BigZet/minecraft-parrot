@@ -3,79 +3,224 @@ package io.github.viewerparrots.twitch;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import io.github.viewerparrots.ViewerParrotsMod;
 import io.github.viewerparrots.api.ActorContext;
+import io.github.viewerparrots.api.CommandRequest;
+import io.github.viewerparrots.api.CommandResult;
+import io.github.viewerparrots.auth.TwitchAuthService;
 import io.github.viewerparrots.bootstrap.ServerContext;
-import net.fabricmc.loader.api.FabricLoader;
+import io.github.viewerparrots.control.ControlPanelService;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.text.Text;
-import java.io.IOException;
+import java.util.ArrayDeque;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicLong;
 
-/** A world-owned connection: socket work never runs on the Minecraft thread. */
+/** World-owned IRC connection; credentials and network work stay off the game thread. */
 public final class TwitchChatBridge {
-    private static TwitchChatBridge active;
+    private static volatile TwitchChatBridge active;
+    private static volatile boolean paused;
+    private static volatile boolean chatStopped;
     private final ServerContext context;
-    private Connection connection;
-    private String lastResult = "—";
+    private final AtomicLong connectGeneration = new AtomicLong();
+    private final ArrayDeque<ControlPanelService.RecentCommand> history = new ArrayDeque<>();
+    private volatile Connection connection;
+    private volatile String lastResult = "—";
+    private volatile String connectionState = "STOPPED";
+    private boolean autoConnectChecked;
 
     private TwitchChatBridge(ServerContext context) { this.context = context; }
 
     public static void onWorldOpened(ServerContext context) {
-        if (context.server().isDedicated()) return;
-        active = new TwitchChatBridge(context);
-        try {
-            var settings = TwitchChatSettings.loadOrCreate(FabricLoader.getInstance().getConfigDir());
-            if (settings.autoConnect()) active.connect(settings);
-        } catch (IOException | IllegalArgumentException invalidSettings) {
-            ViewerParrotsMod.LOGGER.warn("Twitch: check viewerparrots-twitch.json and the local token file.");
-        }
+        if (!context.server().isDedicated()) active = new TwitchChatBridge(context);
     }
 
     public static void onWorldClosed(MinecraftServer server) {
-        if (active != null && active.context.server() == server) {
-            active.disconnect();
+        var bridge = active;
+        if (bridge != null && bridge.context.server() == server) {
             active = null;
+            bridge.disconnect();
         }
     }
 
     public static void tick(ServerContext context) {
-        if (active == null || active.context != context || active.connection == null) return;
         var bridge = active;
-        var inbox = bridge.connection.inbox;
-        if (!context.acceptingCommands() || !context.isRegistryReady()) {
-            inbox.discardPending();
-            return;
+        if (bridge == null || bridge.context != context) return;
+        // Bootstrap first: queue capacity belongs to the profile loaded for this world.
+        if (!bridge.autoConnectChecked && context.isRegistryReady()) {
+            bridge.autoConnectChecked = true;
+            if (ControlPanelService.settings().twitch().autoConnect()) connectFromSettings();
         }
-        for (int i = 0; i < 4; i++) {
-            var next = inbox.poll();
+        var connection = bridge.connection;
+        if (connection == null) return;
+        if (!bridge.accepting(connection)) { connection.inbox.discardPending(); return; }
+        int perTick = ControlPanelService.settings().active().moderation().commandsPerTick();
+        for (int i = 0; i < perTick; i++) {
+            var next = connection.inbox.pollEntry();
             if (next.isEmpty()) break;
-            var request = next.get();
-            // Level 4 belongs to this trusted adapter, after its fixed command/ownership mapping.
-            var actor = new ActorContext(ActorContext.SourceType.INTERNAL_API, null, 4, request.viewerId().value());
+            var entry = next.get();
+            var request = entry.request();
+            var actor = ActorContext.twitch(request.viewerId().value(), entry.roles());
             try {
-                context.api().submit(request, actor).whenComplete((result, error) -> {
-                    bridge.lastResult = error != null ? "ERROR"
-                            : result.code() == null ? result.status().name() : result.code().name();
-                });
-            } catch (RuntimeException commandFailed) {
-                bridge.lastResult = "ERROR";
-            }
+                context.api().submit(request, actor).whenComplete((result, error) ->
+                        context.server().execute(() -> {
+                            if (active == bridge && ServerContext.current().orElse(null) == context)
+                                bridge.record(request, result, error);
+                        }));
+            } catch (RuntimeException failed) { bridge.record(request, null, failed); }
         }
     }
 
-    private void connect(TwitchChatSettings settings) {
-        settings.requireConfigured();
-        disconnect();
-        connection = new Connection(settings);
-        lastResult = "—";
-        connection.client.start();
+    public static String status() {
+        var bridge = active;
+        if (bridge == null) return "STOPPED";
+        var connection = bridge.connection;
+        if (connection == null) return bridge.connectionState;
+        if (connection.closed) return "STOPPED";
+        if (chatStopped) return "CHAT_STOPPED";
+        if (paused) return "PAUSED";
+        return connection.status.name();
+    }
+
+    public static int pending() {
+        var bridge = active;
+        var connection = bridge == null ? null : bridge.connection;
+        return connection == null ? 0 : connection.inbox.pending();
+    }
+
+    public static List<ControlPanelService.RecentCommand> recent() {
+        var bridge = active;
+        if (bridge == null) return List.of();
+        synchronized (bridge.history) { return List.copyOf(bridge.history); }
+    }
+
+    public static void setPaused(boolean value) { paused = value; refreshAcceptance(); }
+    public static void setChatStopped(boolean value) { chatStopped = value; refreshAcceptance(); }
+
+    private static void refreshAcceptance() {
+        var bridge = active;
+        var connection = bridge == null ? null : bridge.connection;
+        if (connection != null) connection.inbox.setAccepting(bridge.accepting(connection));
+    }
+
+    /** Guest mode must be selected explicitly; failed authorization never silently becomes guest access. */
+    public static CompletableFuture<String> connectFromSettings() {
+        var bridge = active;
+        if (bridge == null) return CompletableFuture.completedFuture("Откройте одиночный мир.");
+        var result = new CompletableFuture<String>();
+        long generation = bridge.connectGeneration.incrementAndGet();
+        bridge.context.server().execute(() -> {
+            if (!bridge.current(generation)) { result.complete("Подключение отменено."); return; }
+            if (!bridge.context.isRegistryReady()) { result.complete("Мир ещё загружается. Повторите подключение чуть позже."); return; }
+            bridge.autoConnectChecked = true;
+            var settings = ControlPanelService.settings().twitch();
+            if (settings.channel().isEmpty()) { result.complete("Укажите Twitch-канал в настройках."); return; }
+            bridge.closeConnection();
+            bridge.connectionState = "CONNECTING";
+            var auth = ControlPanelService.auth();
+            if (auth == null) {
+                bridge.connectionState = "STOPPED";
+                result.complete("Настройки Twitch ещё загружаются.");
+                return;
+            }
+            auth.configure(settings.clientId(), settings.login());
+            CompletableFuture<String> token = settings.guest() ? CompletableFuture.completedFuture("") : auth.accessToken();
+            token.whenComplete((access, error) -> bridge.context.server().execute(() -> {
+                if (!bridge.current(generation)) { result.complete("Подключение отменено."); return; }
+                if (!settings.equals(ControlPanelService.settings().twitch())) {
+                    bridge.connectionState = "STOPPED";
+                    result.complete("Настройки Twitch изменились. Нажмите «Подключить» ещё раз.");
+                    return;
+                }
+                if (error != null || (!settings.guest() && (access == null || access.isBlank()))) {
+                    bridge.connectionState = "NEEDS_LOGIN";
+                    result.complete("Войдите в Twitch через настройки или явно включите гостевое чтение.");
+                    return;
+                }
+                try {
+                    String login = settings.guest() ? "" : auth.status().login();
+                    var credentials = new TwitchChatSettings(settings.autoConnect(), settings.channel(), login,
+                            settings.guest() ? "" : access);
+                    credentials.requireConfigured();
+                    Connection installed = bridge.new Connection(credentials, settings.guest(), bridge.context.twitchQueueCapacity());
+                    bridge.connection = installed;
+                    bridge.lastResult = "—";
+                    installed.client.start();
+                    result.complete("Подключение Twitch начато.");
+                } catch (IllegalArgumentException invalid) {
+                    bridge.connectionState = "NEEDS_LOGIN";
+                    result.complete("Проверьте канал и вход Twitch в настройках.");
+                }
+            }));
+        });
+        return result;
+    }
+
+    public static void disconnectNow() {
+        var bridge = active;
+        if (bridge == null) return;
+        bridge.connectGeneration.incrementAndGet();
+        var connection = bridge.connection;
+        if (connection != null) connection.close();
+        bridge.context.server().execute(() -> {
+            if (active == bridge && bridge.connection == connection) {
+                bridge.connection = null;
+                bridge.connectionState = "STOPPED";
+                bridge.autoConnectChecked = true;
+            }
+        });
+    }
+
+    /** The auth callback is only a signal; always obtain the current grant afresh. */
+    public static void credentialsChanged() {
+        var bridge = active;
+        if (bridge == null) return;
+        bridge.context.server().execute(() -> {
+            if (active != bridge) return;
+            var connection = bridge.connection;
+            if (connection == null || connection.guest || connection.closed
+                    || ControlPanelService.settings().twitch().guest()) return;
+            var auth = ControlPanelService.auth();
+            if (auth == null) return;
+            if (!auth.status().hasCredentials()) {
+                bridge.disconnect();
+                bridge.connectionState = "NEEDS_LOGIN";
+            } else if (auth.status().state() == TwitchAuthService.State.AUTHENTICATED) connectFromSettings();
+        });
+    }
+
+    private boolean current(long generation) {
+        return active == this && connectGeneration.get() == generation && ServerContext.current().orElse(null) == context;
+    }
+
+    private boolean accepting(Connection connection) {
+        return active == this && this.connection == connection && !connection.closed && !paused && !chatStopped
+                && connection.status == TwitchIrcClient.Status.CONNECTED
+                && context.acceptingCommands() && context.isRegistryReady();
+    }
+
+    private void record(CommandRequest request, CommandResult result, Throwable error) {
+        String code = error != null || result == null ? "ERROR"
+                : result.code() == null ? result.status().name() : result.code().name();
+        if (result != null && result.retryAfterTicks() > 0) code += " (" + ((result.retryAfterTicks() + 19) / 20) + " с)";
+        lastResult = code;
+        synchronized (history) {
+            history.addFirst(new ControlPanelService.RecentCommand(request.viewerId().value(), request.action().name(), code));
+            while (history.size() > 50) history.removeLast();
+        }
+    }
+
+    private void closeConnection() {
+        var previous = connection;
+        connection = null;
+        if (previous != null) previous.close();
     }
 
     private void disconnect() {
-        if (connection != null) {
-            connection.close();
-            connection = null;
-        }
+        connectGeneration.incrementAndGet();
+        closeConnection();
+        connectionState = "STOPPED";
     }
 
     public static LiteralArgumentBuilder<ServerCommandSource> commands() {
@@ -87,11 +232,12 @@ public final class TwitchChatBridge {
     }
 
     private static TwitchChatBridge forSource(ServerCommandSource source) {
-        if (active == null || active.context.server() != source.getServer()) {
+        var bridge = active;
+        if (bridge == null || bridge.context.server() != source.getServer()) {
             source.sendError(Text.literal("Twitch доступен в открытом одиночном мире."));
             return null;
         }
-        return active;
+        return bridge;
     }
 
     private static int connect(ServerCommandSource source) {
@@ -101,21 +247,15 @@ public final class TwitchChatBridge {
             source.sendError(Text.literal("Сначала назначьте стримера: /vp setstreamer <ваш_ник>"));
             return 0;
         }
-        try {
-            var settings = TwitchChatSettings.loadOrCreate(FabricLoader.getInstance().getConfigDir());
-            bridge.connect(settings);
-            source.sendFeedback(() -> Text.literal("Подключение Twitch начато. Статус: /vp twitch status"), false);
-            return 1;
-        } catch (IOException | IllegalArgumentException invalidSettings) {
-            source.sendError(Text.literal("Проверьте канал и login в config/viewerparrots-twitch.json и токен в config/viewerparrots-twitch-token.txt."));
-            return 0;
-        }
+        connectFromSettings().whenComplete((message, error) -> source.getServer().execute(() -> {
+            if (active == bridge) source.sendFeedback(() -> Text.literal(error == null ? message : "Не удалось подключить Twitch."), false);
+        }));
+        return 1;
     }
 
     private static int disconnect(ServerCommandSource source) {
-        var bridge = forSource(source);
-        if (bridge == null) return 0;
-        bridge.disconnect();
+        if (forSource(source) == null) return 0;
+        disconnectNow();
         source.sendFeedback(() -> Text.literal("Twitch отключён. Попугаи остаются в мире."), false);
         return 1;
     }
@@ -124,16 +264,14 @@ public final class TwitchChatBridge {
         var bridge = forSource(source);
         if (bridge == null) return 0;
         var connection = bridge.connection;
-        String state = connection == null ? "STOPPED" : connection.status.name();
         String channel = connection == null ? "" : " #" + connection.channel
-                + (connection.guest ? " (гостевое чтение)" : " (вход по токену)");
-        int pending = connection == null ? 0 : connection.inbox.pending();
-        source.sendFeedback(() -> Text.literal("Twitch: " + state + channel
-                + " | очередь: " + pending + " | последняя команда: " + bridge.lastResult), false);
+                + (connection.guest ? " (гостевое чтение)" : " (вход по аккаунту)");
+        source.sendFeedback(() -> Text.literal("Twitch: " + status() + channel
+                + " | очередь: " + pending() + " | последняя команда: " + bridge.lastResult), false);
         return 1;
     }
 
-    private static final class Connection {
+    private final class Connection {
         private final String channel;
         private final boolean guest;
         private final TwitchCommandInbox inbox;
@@ -141,15 +279,31 @@ public final class TwitchChatBridge {
         private volatile TwitchIrcClient.Status status = TwitchIrcClient.Status.CONNECTING;
         private volatile boolean closed;
 
-        private Connection(TwitchChatSettings settings) {
+        private Connection(TwitchChatSettings settings, boolean guest, int capacity) {
             channel = settings.channel();
-            guest = settings.oauthToken().isEmpty();
-            inbox = new TwitchCommandInbox(channel, 256);
-            client = new TwitchIrcClient(channel, settings.login(), settings.oauthToken(), inbox::offer, next -> {
-                if (closed) return;
+            this.guest = guest;
+            inbox = new TwitchCommandInbox(channel, capacity);
+            client = new TwitchIrcClient(channel, settings.login(), settings.oauthToken(), message -> {
+                if (accepting(this)) inbox.offer(message);
+            }, next -> {
+                if (closed || active != TwitchChatBridge.this || connection != this) return;
                 status = next;
-                inbox.setAccepting(next == TwitchIrcClient.Status.CONNECTED);
+                connectionState = next.name();
+                inbox.setAccepting(accepting(this));
                 ViewerParrotsMod.LOGGER.info("Twitch: {}", next);
+                if (next == TwitchIrcClient.Status.AUTH_FAILED && !guest) authenticationFailed();
+            });
+        }
+
+        private void authenticationFailed() {
+            context.server().execute(() -> {
+                if (closed || active != TwitchChatBridge.this || connection != this) return;
+                var auth = ControlPanelService.auth();
+                if (auth == null) return;
+                auth.authenticationFailed().whenComplete((updated, error) -> context.server().execute(() -> {
+                    if (closed || active != TwitchChatBridge.this || connection != this) return;
+                    if (error == null && updated.state() == TwitchAuthService.State.AUTHENTICATED) connectFromSettings();
+                }));
             });
         }
 
