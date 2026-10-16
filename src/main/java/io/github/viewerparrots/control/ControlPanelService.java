@@ -178,6 +178,7 @@ public final class ControlPanelService {
             var viewer = viewerId == null || viewerId.isBlank() ? ViewerId.of("local:test") : ViewerId.of(viewerId);
             String normalized = action.toUpperCase(Locale.ROOT);
             if (normalized.equals("VOICE")) return context.speechService().setVoice(viewer, argument).thenApply(ignored -> "Голос изменён.");
+            if (normalized.equals("DUEL_CANCEL_ALL")) { context.duelService().cancelAll(); return CompletableFuture.completedFuture("Все дуэли отменены."); }
             if (normalized.equals("HAT_SELECT")) {
                 var bird = context.loadedIndex().find(viewer).or(() -> context.shoulderService().find(viewer));
                 if (bird.isEmpty()) return CompletableFuture.completedFuture("Птица не загружена.");
@@ -192,6 +193,7 @@ public final class ControlPanelService {
                 case SETSTREAMER -> new ActionParameters.Target(owner.getId());
                 case SAY -> ActionParameters.Speech.parse(argument);
                 case NAME -> new ActionParameters.Nickname(argument.isBlank() ? null : DisplayName.of(argument));
+                case FIGHT -> new ActionParameters.Opponent(argument);
                 case EMOTE -> argument.isBlank() ? ActionParameters.None.INSTANCE
                         : new ActionParameters.Emote(io.github.viewerparrots.cosmetic.ParrotEmotes.parse(argument).orElse(argument));
                 default -> ActionParameters.None.INSTANCE;

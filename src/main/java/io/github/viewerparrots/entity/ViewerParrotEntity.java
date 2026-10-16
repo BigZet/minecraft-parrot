@@ -62,6 +62,8 @@ public class ViewerParrotEntity extends ParrotEntity {
 			DataTracker.registerData(ViewerParrotEntity.class, TrackedDataHandlerRegistry.STRING);
 	private static final TrackedData<Long> EMOTE_STARTED_AT =
 			DataTracker.registerData(ViewerParrotEntity.class, TrackedDataHandlerRegistry.LONG);
+	private static final TrackedData<Integer> DUEL_PHASE =
+			DataTracker.registerData(ViewerParrotEntity.class, TrackedDataHandlerRegistry.INTEGER);
 	private static final TrackedData<Boolean> VIEWING_STREAMER =
 			DataTracker.registerData(ViewerParrotEntity.class, TrackedDataHandlerRegistry.BOOLEAN);
 
@@ -112,7 +114,7 @@ public class ViewerParrotEntity extends ParrotEntity {
 	@Override protected BodyControl createBodyControl() { return new ViewingBodyControl(this); }
 
 	public boolean isFreeFlightEnabled() {
-		if (getWorld().isClient() || isForcedDancing() || isSpinning() || isEmoting()) return false;
+		if (getWorld().isClient() || isForcedDancing() || isSpinning() || isEmoting() || duelPhase() != 0) return false;
 		ServerContext context = ServerContext.current().orElse(null);
 		ViewerId id = context == null ? null : context.loadedIndex().findViewerId(getUuid()).orElse(null);
 		var runtime = id == null ? null : context.runtimes().get(id);
@@ -172,6 +174,7 @@ public class ViewerParrotEntity extends ParrotEntity {
 		builder.add(VIEWING_STREAMER, false);
 		builder.add(EMOTE_ID, "");
 		builder.add(EMOTE_STARTED_AT, -1L);
+		builder.add(DUEL_PHASE, 0);
 	}
 
 	// --- Маркер реестра (раздел 4.3 ТЗ) --------------------------------------
@@ -317,6 +320,14 @@ public class ViewerParrotEntity extends ParrotEntity {
 		if (!isEmoting()) return 0.0f;
 		float elapsed = (float) (this.getWorld().getTime() - this.dataTracker.get(EMOTE_STARTED_AT)) + tickDelta;
 		return Math.min(1.0f, elapsed / io.github.viewerparrots.cosmetic.ParrotEmotes.DURATION_TICKS);
+	}
+
+	/** Фаза дуэли {@code !fight} (см. {@code DuelService.PHASE_*}); не сохраняется в NBT. */
+	public int duelPhase() { return this.dataTracker.get(DUEL_PHASE); }
+
+	public void setDuelPhase(int phase) {
+		if (this.getWorld().isClient()) throw new IllegalStateException("Duel phase changes on the server");
+		this.dataTracker.set(DUEL_PHASE, phase);
 	}
 
 	@Override public int getMaxHeadRotation() {

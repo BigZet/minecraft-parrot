@@ -107,6 +107,7 @@ class LifecycleStateMachineTest {
 	void gameplayActionsRequireLoaded() {
 		for (ParrotAction action : new ParrotAction[]{
 				ParrotAction.FOLLOW, ParrotAction.SIT, ParrotAction.DANCE, ParrotAction.HAT, ParrotAction.DEHAT, ParrotAction.COLOR, ParrotAction.NAME, ParrotAction.EMOTE,
+				ParrotAction.FIGHT, ParrotAction.ACCEPT, ParrotAction.DECLINE,
 				ParrotAction.FREE, ParrotAction.FREEFOLLOW, ParrotAction.VIEW, ParrotAction.DEVIEW,
 				ParrotAction.ARM, ParrotAction.DEARM,
 				ParrotAction.SCREAM, ParrotAction.LOVE, ParrotAction.EXP, ParrotAction.ROULETTE}) {

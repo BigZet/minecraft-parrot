@@ -102,6 +102,7 @@ public final class ServerContext {
 	private SoundService soundService;
 	private ParrotSpeechService speechService;
 	private RouletteService rouletteService;
+	private io.github.viewerparrots.duel.DuelService duelService;
 	private BehaviorScheduler behaviorScheduler;
 	private DefaultViewerParrotApi api;
 
@@ -186,6 +187,7 @@ public final class ServerContext {
 		this.soundService = new SoundService(this.config, this.behaviorRandom);
 		this.speechService = new ParrotSpeechService(this, FabricLoader.getInstance().getConfigDir());
 		this.rouletteService = new RouletteService(this);
+		this.duelService = new io.github.viewerparrots.duel.DuelService(this);
 		this.commandService = new ParrotCommandService(this);
 		this.behaviorScheduler = new BehaviorScheduler(this);
 		this.api = new DefaultViewerParrotApi(this);
@@ -260,6 +262,7 @@ public final class ServerContext {
 	public void forgetRuntime(ViewerId viewerId) {
 		if (this.commandService != null) this.commandService.cancelRuntime(viewerId, ErrorCode.INVALID_STATE);
 		if (this.rouletteService != null) this.rouletteService.cancel(viewerId);
+		if (this.duelService != null) this.duelService.abort(viewerId);
 		this.runtimes.remove(viewerId);
 	}
 
@@ -427,6 +430,7 @@ public final class ServerContext {
 		this.recoveryService.cancelAll();
 		this.speechService.close();
 		this.rouletteService.close();
+		this.duelService.cancelAll();
 		CheckpointScheduler.saveOnShutdown(this);
 		this.commandService.clear();
 		this.api.clear();
@@ -538,6 +542,7 @@ public final class ServerContext {
 
 	public ParrotSpeechService speechService() { return this.speechService; }
 	public RouletteService rouletteService() { return this.rouletteService; }
+	public io.github.viewerparrots.duel.DuelService duelService() { return this.duelService; }
 
 	public EventDispatcher events() {
 		return this.events;

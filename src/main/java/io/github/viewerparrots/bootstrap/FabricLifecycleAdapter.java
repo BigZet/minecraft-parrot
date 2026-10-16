@@ -252,6 +252,7 @@ public final class FabricLifecycleAdapter {
 			CheckpointScheduler.tick(context);
 			TwitchChatBridge.tick(context);
 			context.rouletteService().tick();
+			context.duelService().tick();
 		});
 	}
 

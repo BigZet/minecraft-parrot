@@ -251,6 +251,9 @@ public final class ControlPanelScreen extends JsonFormScreen {
         for (String group : List.of("come", "follow", "dance", "behavior", "sound")) {
             heading(label(group)); group(profilePath() + ".general." + group);
         }
+        heading("Дуэли !fight");
+        action("Дуэли", "Снять все ожидающие вызовы и прервать текущие дуэли без победителя.", "Отменить все дуэли",
+                dashboard != null && dashboard.worldOpen(), () -> runWorld(null, "DUEL_CANCEL_ALL", "", false));
     }
 
     private void speech() {
@@ -526,6 +529,9 @@ public final class ControlPanelScreen extends JsonFormScreen {
             case "COLOR" -> "Сменить окрас на случайный другой";
             case "NAME" -> "Кличка птицы (!name Текст; !name — убрать)";
             case "EMOTE" -> "Случайная эмоция: поклон, нет, кивок, прыжок";
+            case "FIGHT" -> "Вызов на дуэль (!fight @ник)";
+            case "ACCEPT" -> "Принять вызов на дуэль";
+            case "DECLINE" -> "Отклонить вызов на дуэль";
             case "EXP" -> "Разбить пузырёк опыта у птицы";
             case "ROULETTE" -> "Разыграть предмет";
             default -> name;

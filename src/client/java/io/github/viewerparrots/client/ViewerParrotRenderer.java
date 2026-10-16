@@ -46,6 +46,12 @@ public class ViewerParrotRenderer extends ParrotEntityRenderer {
 			// LivingEntityRenderer restores this model stack before rendering the name.
 			matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(parrot.getSpinAngle(tickDelta)));
 		}
+		if (parrot != null && parrot.duelPhase() == 1) {
+			// Потасовка: быстрое дрожание по рысканью и подпрыгивание на месте.
+			float time = (float) (parrot.getWorld().getTime() % 24000L) + tickDelta;
+			matrices.translate(0.0, 0.06 * Math.abs(MathHelper.sin(time * 0.9f)), 0.0);
+			matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(15.0f * MathHelper.sin(time * 1.3f)));
+		}
 		float emote = parrot == null ? 0.0f : parrot.getEmoteProgress(tickDelta);
 		if (parrot != null && emote > 0.0f && ParrotEmotes.SHAKE.equals(parrot.emoteId())) {
 			// Рысканье не зависит от поворота тела, поэтому применяется до него.

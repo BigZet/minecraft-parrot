@@ -108,6 +108,19 @@ class TwitchCommandInboxTest {
         assertTrue(TwitchCommandInbox.command(message("5", "!colors", "color-lookalike"), "streamer").isEmpty());
     }
 
+    @Test void duelCommandsCarryTheOpponentAndAcceptDeclineTakeNoArguments() {
+        var fight = TwitchCommandInbox.command(message("11", "!fight @Gosha_Parrot", "fight"), "streamer").orElseThrow();
+        assertEquals(ParrotAction.FIGHT, fight.action());
+        assertEquals("Gosha_Parrot", ((ActionParameters.Opponent) fight.parameters()).name());
+        var duel = TwitchCommandInbox.command(message("11", "!duel twitch:42", "duel-alias"), "streamer").orElseThrow();
+        assertEquals(ParrotAction.FIGHT, duel.action());
+        assertTrue(TwitchCommandInbox.command(message("11", "!fight", "fight-no-target"), "streamer").isEmpty());
+        assertTrue(TwitchCommandInbox.command(message("11", "!fight @", "fight-empty-target"), "streamer").isEmpty());
+        assertEquals(ParrotAction.ACCEPT, TwitchCommandInbox.command(message("11", "!Accept", "accept"), "streamer").orElseThrow().action());
+        assertEquals(ParrotAction.DECLINE, TwitchCommandInbox.command(message("11", "!decline", "decline"), "streamer").orElseThrow().action());
+        assertTrue(TwitchCommandInbox.command(message("11", "!accept now", "accept-arg"), "streamer").isEmpty());
+    }
+
     @Test void emoteIsRandomWithoutArgumentAndNamedWithOne() {
         var random = TwitchCommandInbox.command(message("9", "!emote", "emote-random"), "streamer").orElseThrow();
         assertEquals(ParrotAction.EMOTE, random.action());

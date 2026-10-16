@@ -9,14 +9,15 @@ import java.util.UUID;
 /** Typed values for the only actions requiring parameters; arbitrary executable JSON is never accepted. */
 public sealed interface ActionParameters permits ActionParameters.None, ActionParameters.Name,
         ActionParameters.Trait, ActionParameters.Target, ActionParameters.Page, ActionParameters.Speech, ActionParameters.Color,
-        ActionParameters.Nickname, ActionParameters.Emote {
+        ActionParameters.Nickname, ActionParameters.Emote, ActionParameters.Opponent {
     boolean supports(ParrotAction action);
 
     enum None implements ActionParameters {
         INSTANCE;
         @Override public boolean supports(ParrotAction action) {
             return action != ParrotAction.CREATE && action != ParrotAction.RENAME
-                    && action != ParrotAction.TRAIT && action != ParrotAction.SETSTREAMER && action != ParrotAction.SAY;
+                    && action != ParrotAction.TRAIT && action != ParrotAction.SETSTREAMER && action != ParrotAction.SAY
+                    && action != ParrotAction.FIGHT;
         }
     }
     record Name(DisplayName name) implements ActionParameters {
@@ -38,6 +39,17 @@ public sealed interface ActionParameters permits ActionParameters.None, ActionPa
             if (!io.github.viewerparrots.cosmetic.ParrotEmotes.isKnown(id)) throw new IllegalArgumentException("Unknown parrot emote");
         }
         @Override public boolean supports(ParrotAction action) { return action == ParrotAction.EMOTE; }
+    }
+    /** Соперник для {@code !fight @ник}: имя или {@code twitch:id}; разрешается службой дуэлей. */
+    record Opponent(String name) implements ActionParameters {
+        public Opponent {
+            name = Objects.requireNonNull(name, "name").strip();
+            if (name.startsWith("@")) name = name.substring(1).strip();
+            if (name.isEmpty() || name.length() > 64 || name.chars().anyMatch(Character::isISOControl)) {
+                throw new IllegalArgumentException("Opponent name must be 1-64 printable characters");
+            }
+        }
+        @Override public boolean supports(ParrotAction action) { return action == ParrotAction.FIGHT; }
     }
     record Trait(ParrotTrait trait) implements ActionParameters {
         public Trait { Objects.requireNonNull(trait, "trait"); }

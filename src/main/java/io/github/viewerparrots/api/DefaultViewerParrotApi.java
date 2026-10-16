@@ -95,7 +95,7 @@ public final class DefaultViewerParrotApi implements ViewerParrotApi {
             case RESPAWN -> context.parrotService().respawn(id, actor, viewer);
             case SETSTREAMER -> context.streamerService().assign(id, actor, ((ActionParameters.Target) request.parameters()).playerUuid());
             case RECONCILE -> CompletableFuture.completedFuture(context.parrotService().reconcile(id, actor, viewer));
-            case COME, FOLLOW, FREE, FREEFOLLOW, VIEW, DEVIEW, ARM, DEARM, SIT, DANCE, SPIN, SCREAM, LOVE, HAT, DEHAT, COLOR, NAME, EMOTE, EXP, ROULETTE -> {
+            case COME, FOLLOW, FREE, FREEFOLLOW, VIEW, DEVIEW, ARM, DEARM, SIT, DANCE, SPIN, SCREAM, LOVE, HAT, DEHAT, COLOR, NAME, EMOTE, FIGHT, ACCEPT, DECLINE, EXP, ROULETTE -> {
                 CommandResult initial = context.commandService().submit(id, actor, request.action(), viewer, request.parameters());
                 yield initial.status() == CommandStatus.ACCEPTED ? context.commandService().completion(id) : CompletableFuture.completedFuture(initial);
             }

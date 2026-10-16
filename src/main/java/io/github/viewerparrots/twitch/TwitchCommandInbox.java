@@ -44,8 +44,9 @@ public final class TwitchCommandInbox {
         boolean colorCommand = words[0].equalsIgnoreCase("!color");
         boolean nameCommand = words[0].equalsIgnoreCase("!name");
         boolean emoteCommand = words[0].equalsIgnoreCase("!emote");
+        boolean fightCommand = (words[0].equalsIgnoreCase("!fight") || words[0].equalsIgnoreCase("!duel")) && !argument.isEmpty();
         ParrotAction action = speech ? ParrotAction.SAY : colorCommand ? ParrotAction.COLOR : nameCommand ? ParrotAction.NAME
-                : emoteCommand ? ParrotAction.EMOTE : switch (text.toLowerCase(Locale.ROOT)) {
+                : emoteCommand ? ParrotAction.EMOTE : fightCommand ? ParrotAction.FIGHT : switch (text.toLowerCase(Locale.ROOT)) {
             case "!parrot" -> ParrotAction.CREATE;
             case "!come" -> ParrotAction.COME;
             case "!follow" -> ParrotAction.FOLLOW;
@@ -64,6 +65,8 @@ public final class TwitchCommandInbox {
             case "!dehat" -> ParrotAction.DEHAT;
             case "!exp" -> ParrotAction.EXP;
             case "!roulette" -> ParrotAction.ROULETTE;
+            case "!accept" -> ParrotAction.ACCEPT;
+            case "!decline" -> ParrotAction.DECLINE;
             default -> null;
         };
         if (action == null) return Optional.empty();
@@ -80,6 +83,8 @@ public final class TwitchCommandInbox {
                 var emote = io.github.viewerparrots.cosmetic.ParrotEmotes.parse(argument);
                 if (emote.isEmpty()) return Optional.empty();
                 parameters = new ActionParameters.Emote(emote.get());
+            } else if (fightCommand) {
+                parameters = new ActionParameters.Opponent(argument);
             } else if (nameCommand) {
                 // Пустой !name убирает кличку; недопустимое имя (§, управляющие, >32 символов) — не команда.
                 parameters = new ActionParameters.Nickname(argument.isEmpty() ? null : DisplayName.of(argument));

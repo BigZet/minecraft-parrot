@@ -181,6 +181,25 @@ public final class ParrotCommandService {
                 && !io.github.viewerparrots.control.ControlPanelService.settings().active().moderation().allowsNickname(nick.nickname().value())) {
             return CommandResult.rejected(commandId, ErrorCode.INVALID_ARGUMENT);
         }
+        // Duel commands are decided by the duel service right here; they never change the bird's behavior.
+        if (isDuelAction(action)) {
+            ErrorCode error = switch (action) {
+                case FIGHT -> parameters instanceof ActionParameters.Opponent opponent
+                        ? this.context.duelService().challenge(record, parrot, opponent.name()) : ErrorCode.INVALID_ARGUMENT;
+                case ACCEPT -> this.context.duelService().accept(viewerId);
+                default -> this.context.duelService().decline(viewerId);
+            };
+            if (error != null) return CommandResult.rejected(commandId, error);
+            this.context.rateLimiter().tryAcquire(action);
+            this.context.cooldowns().consume(viewerId, action, effectiveCooldown);
+            CommandResult done = CommandResult.succeeded(commandId, "viewerparrots.action.ok",
+                    CommandResult.details("viewerId", viewerId.value(), "action", action.name()));
+            this.resultCache.remember(done);
+            publishCurrent(ParrotEvent.Type.COMMAND_COMPLETED, viewerId, commandId, null, action.name(), null);
+            return done;
+        }
+        // Any other command of a duel participant ends the duel without a winner, then runs as usual.
+        if (this.context.duelService().involves(viewerId)) this.context.duelService().abort(viewerId);
         if (action == ParrotAction.ROULETTE) {
             ErrorCode error = this.context.rouletteService().enqueue(commandId, record, parrot);
             if (error != null) return CommandResult.rejected(commandId, error);
@@ -497,7 +516,8 @@ public final class ParrotCommandService {
 
     private static boolean requiresTarget(ParrotAction action) { return action == ParrotAction.COME || action == ParrotAction.FOLLOW || action == ParrotAction.FREEFOLLOW || action == ParrotAction.ARM || action == ParrotAction.VIEW || action == ParrotAction.ROULETTE; }
     private static boolean preservesBehavior(ParrotAction action) { return CommandPolicy.preservesBehavior(action); }
-    private static boolean isGameAction(ParrotAction action) { return switch (action) { case COME, FOLLOW, FREE, FREEFOLLOW, VIEW, DEVIEW, ARM, DEARM, SIT, DANCE, SPIN, HAT, DEHAT, COLOR, NAME, EMOTE, SCREAM, LOVE, EXP, ROULETTE -> true; default -> false; }; }
+    private static boolean isGameAction(ParrotAction action) { return switch (action) { case COME, FOLLOW, FREE, FREEFOLLOW, VIEW, DEVIEW, ARM, DEARM, SIT, DANCE, SPIN, HAT, DEHAT, COLOR, NAME, EMOTE, FIGHT, ACCEPT, DECLINE, SCREAM, LOVE, EXP, ROULETTE -> true; default -> false; }; }
+    private static boolean isDuelAction(ParrotAction action) { return action == ParrotAction.FIGHT || action == ParrotAction.ACCEPT || action == ParrotAction.DECLINE; }
     private static ParrotAction cooldownKey(ParrotAction action) { return CommandPolicy.cooldownKey(action); }
     private static BehaviorStateMachine.Event toEvent(ParrotAction action) {
         return switch (action) {
@@ -517,6 +537,9 @@ public final class ParrotCommandService {
             case COLOR -> BehaviorStateMachine.Event.COMMAND_COLOR;
             case NAME -> BehaviorStateMachine.Event.COMMAND_NAME;
             case EMOTE -> BehaviorStateMachine.Event.COMMAND_EMOTE;
+            case FIGHT -> BehaviorStateMachine.Event.COMMAND_FIGHT;
+            case ACCEPT -> BehaviorStateMachine.Event.COMMAND_ACCEPT;
+            case DECLINE -> BehaviorStateMachine.Event.COMMAND_DECLINE;
             case SCREAM -> BehaviorStateMachine.Event.COMMAND_SCREAM;
             case LOVE -> BehaviorStateMachine.Event.COMMAND_LOVE;
             case EXP -> BehaviorStateMachine.Event.COMMAND_EXP;
@@ -526,7 +549,7 @@ public final class ParrotCommandService {
     }
     private long cooldownFor(ParrotAction action) {
         var c = this.context.config().cooldowns();
-        return switch (action) { case COME -> c.come(); case FOLLOW -> c.follow(); case SIT -> c.sit(); case DANCE -> c.dance(); case SPIN -> ParrotAction.SPIN_COOLDOWN_TICKS; case HAT, DEHAT -> ParrotAction.HAT_COOLDOWN_TICKS; case COLOR -> ParrotAction.COLOR_COOLDOWN_TICKS; case NAME -> ParrotAction.NAME_COOLDOWN_TICKS; case EMOTE -> ParrotAction.EMOTE_COOLDOWN_TICKS; case FREE, FREEFOLLOW, VIEW, DEVIEW, ARM, DEARM -> ParrotAction.SIMPLE_CONTROL_COOLDOWN_TICKS; case SCREAM -> c.scream(); case LOVE -> 40; case EXP -> ParrotAction.EXP_COOLDOWN_TICKS; default -> 0; };
+        return switch (action) { case COME -> c.come(); case FOLLOW -> c.follow(); case SIT -> c.sit(); case DANCE -> c.dance(); case SPIN -> ParrotAction.SPIN_COOLDOWN_TICKS; case HAT, DEHAT -> ParrotAction.HAT_COOLDOWN_TICKS; case COLOR -> ParrotAction.COLOR_COOLDOWN_TICKS; case NAME -> ParrotAction.NAME_COOLDOWN_TICKS; case EMOTE -> ParrotAction.EMOTE_COOLDOWN_TICKS; case FIGHT -> ParrotAction.FIGHT_COOLDOWN_TICKS; case FREE, FREEFOLLOW, VIEW, DEVIEW, ARM, DEARM -> ParrotAction.SIMPLE_CONTROL_COOLDOWN_TICKS; case SCREAM -> c.scream(); case LOVE -> 40; case EXP -> ParrotAction.EXP_COOLDOWN_TICKS; default -> 0; };
     }
 
     private static boolean dropExperienceBottle(ViewerParrotEntity parrot) {
