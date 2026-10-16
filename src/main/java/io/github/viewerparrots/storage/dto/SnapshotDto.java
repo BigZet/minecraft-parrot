@@ -30,7 +30,11 @@ public record SnapshotDto(
 		return new SnapshotDto(CURRENT_SCHEMA_VERSION, 0L, null, Map.of(), List.of());
 	}
 
-	public record ViewerDto(String viewerId, String displayName, Instant createdAt) {
+	/** {@code nickname} появился вместе с {@code !name}; в старых файлах его нет и он читается как {@code null}. */
+	public record ViewerDto(String viewerId, String displayName, Instant createdAt, String nickname) {
+		public ViewerDto(String viewerId, String displayName, Instant createdAt) {
+			this(viewerId, displayName, createdAt, null);
+		}
 	}
 
 	public record LocationDto(String dimension, double x, double y, double z) {

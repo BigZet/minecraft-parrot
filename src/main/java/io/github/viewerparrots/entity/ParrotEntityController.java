@@ -18,6 +18,7 @@ import java.util.UUID;
  */
 public final class ParrotEntityController {
 	public static final String NAME_PLACEHOLDER = "{viewer_name}";
+	public static final String TWITCH_NAME_PLACEHOLDER = "{twitch_name}";
 
 	private final ViewerParrotsConfig config;
 
@@ -70,8 +71,10 @@ public final class ParrotEntityController {
 	 * (раздел 4.1 ТЗ).
 	 */
 	public void applyName(ViewerParrotEntity parrot, ViewerParrotRecord record) {
+		// {viewer_name} — то, что хочет видеть зритель: кличка из !name либо его имя; {twitch_name} — всегда имя.
 		String name = this.config.nameFormat()
-				.replace(NAME_PLACEHOLDER, record.viewer().displayName().value());
+				.replace(NAME_PLACEHOLDER, record.viewer().shownName().value())
+				.replace(TWITCH_NAME_PLACEHOLDER, record.viewer().displayName().value());
 		parrot.setCustomName(Text.literal(name));
 		parrot.setCustomNameVisible(this.config.nameVisible());
 	}

@@ -42,7 +42,9 @@ public final class TwitchCommandInbox {
         String[] words = WORD_SPLIT.split(text, 2);
         String argument = words.length > 1 ? words[1].strip() : "";
         boolean colorCommand = words[0].equalsIgnoreCase("!color");
-        ParrotAction action = speech ? ParrotAction.SAY : colorCommand ? ParrotAction.COLOR : switch (text.toLowerCase(Locale.ROOT)) {
+        boolean nameCommand = words[0].equalsIgnoreCase("!name");
+        ParrotAction action = speech ? ParrotAction.SAY : colorCommand ? ParrotAction.COLOR : nameCommand ? ParrotAction.NAME
+                : switch (text.toLowerCase(Locale.ROOT)) {
             case "!parrot" -> ParrotAction.CREATE;
             case "!come" -> ParrotAction.COME;
             case "!follow" -> ParrotAction.FOLLOW;
@@ -73,6 +75,9 @@ public final class TwitchCommandInbox {
                 var variant = io.github.viewerparrots.cosmetic.ParrotColors.parse(argument);
                 if (variant.isEmpty()) return Optional.empty();
                 parameters = new ActionParameters.Color(variant.get());
+            } else if (nameCommand) {
+                // Пустой !name убирает кличку; недопустимое имя (§, управляющие, >32 символов) — не команда.
+                parameters = new ActionParameters.Nickname(argument.isEmpty() ? null : DisplayName.of(argument));
             } else parameters = ActionParameters.None.INSTANCE;
             UUID commandId = message.messageId() == null || message.messageId().isEmpty() ? UUID.randomUUID()
                     : UUID.nameUUIDFromBytes(("twitch-message:" + message.messageId()).getBytes(StandardCharsets.UTF_8));

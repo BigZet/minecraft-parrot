@@ -173,6 +173,10 @@ public final class ParrotCommandService {
         long remaining = this.context.cooldowns().remainingTicks(viewerId, cooldownKey(action));
         if (remaining > 0) return CommandResult.retryLater(commandId, ErrorCode.COMMAND_ON_COOLDOWN, remaining);
 
+        if (action == ParrotAction.NAME && parameters instanceof ActionParameters.Nickname nick && nick.nickname() != null
+                && !io.github.viewerparrots.control.ControlPanelService.settings().active().moderation().allowsNickname(nick.nickname().value())) {
+            return CommandResult.rejected(commandId, ErrorCode.INVALID_ARGUMENT);
+        }
         if (action == ParrotAction.ROULETTE) {
             ErrorCode error = this.context.rouletteService().enqueue(commandId, record, parrot);
             if (error != null) return CommandResult.rejected(commandId, error);
@@ -261,11 +265,16 @@ public final class ParrotCommandService {
         ParrotVariant newVariant = action != ParrotAction.COLOR ? null
                 : pending.parameters instanceof ActionParameters.Color explicit ? explicit.variant()
                 : io.github.viewerparrots.cosmetic.ParrotColors.randomDifferent(pending.identity.variant(), this.context.behaviorRandom());
+        // Кличка: null (или None из /vp name) возвращает имя зрителя.
+        io.github.viewerparrots.domain.DisplayName newNickname =
+                pending.parameters instanceof ActionParameters.Nickname nick ? nick.nickname() : null;
         switch (action) {
             case HAT -> parrot.setHatId(io.github.viewerparrots.cosmetic.ParrotHats.randomDifferent(
                     parrot.hatId(), this.context.behaviorRandom()));
             case DEHAT -> parrot.setHatId("");
             case COLOR -> parrot.setVariant(io.github.viewerparrots.entity.VanillaVariantMapper.toVanilla(newVariant));
+            case NAME -> this.context.parrotService().controller().applyName(parrot,
+                    pending.identity.withNickname(newNickname, this.context.clock().now()));
             case VIEW -> parrot.setViewingStreamer(true);
             case DEVIEW -> parrot.setViewingStreamer(false);
             case SPIN -> {
@@ -321,6 +330,7 @@ public final class ParrotCommandService {
         if (this.pendingCommands.get(commandId) != pending) return this.resultCache.find(commandId).orElseThrow();
 
         CompletableFuture<Void> durable = action == ParrotAction.COLOR ? this.context.parrotService().recordVariant(viewerId, newVariant)
+                : action == ParrotAction.NAME ? this.context.parrotService().recordNickname(viewerId, newNickname)
                 : preservesBehavior(action) ? CompletableFuture.completedFuture(null) : persistDesiredBehavior(viewerId, runtime);
         durable.whenComplete((ignored, error) -> {
             if (this.pendingCommands.get(commandId) != pending) return;
@@ -470,7 +480,7 @@ public final class ParrotCommandService {
 
     private static boolean requiresTarget(ParrotAction action) { return action == ParrotAction.COME || action == ParrotAction.FOLLOW || action == ParrotAction.FREEFOLLOW || action == ParrotAction.ARM || action == ParrotAction.VIEW || action == ParrotAction.ROULETTE; }
     private static boolean preservesBehavior(ParrotAction action) { return CommandPolicy.preservesBehavior(action); }
-    private static boolean isGameAction(ParrotAction action) { return switch (action) { case COME, FOLLOW, FREE, FREEFOLLOW, VIEW, DEVIEW, ARM, DEARM, SIT, DANCE, SPIN, HAT, DEHAT, COLOR, SCREAM, LOVE, EXP, ROULETTE -> true; default -> false; }; }
+    private static boolean isGameAction(ParrotAction action) { return switch (action) { case COME, FOLLOW, FREE, FREEFOLLOW, VIEW, DEVIEW, ARM, DEARM, SIT, DANCE, SPIN, HAT, DEHAT, COLOR, NAME, SCREAM, LOVE, EXP, ROULETTE -> true; default -> false; }; }
     private static ParrotAction cooldownKey(ParrotAction action) { return CommandPolicy.cooldownKey(action); }
     private static BehaviorStateMachine.Event toEvent(ParrotAction action) {
         return switch (action) {
@@ -488,6 +498,7 @@ public final class ParrotCommandService {
             case HAT -> BehaviorStateMachine.Event.COMMAND_HAT;
             case DEHAT -> BehaviorStateMachine.Event.COMMAND_DEHAT;
             case COLOR -> BehaviorStateMachine.Event.COMMAND_COLOR;
+            case NAME -> BehaviorStateMachine.Event.COMMAND_NAME;
             case SCREAM -> BehaviorStateMachine.Event.COMMAND_SCREAM;
             case LOVE -> BehaviorStateMachine.Event.COMMAND_LOVE;
             case EXP -> BehaviorStateMachine.Event.COMMAND_EXP;
@@ -497,7 +508,7 @@ public final class ParrotCommandService {
     }
     private long cooldownFor(ParrotAction action) {
         var c = this.context.config().cooldowns();
-        return switch (action) { case COME -> c.come(); case FOLLOW -> c.follow(); case SIT -> c.sit(); case DANCE -> c.dance(); case SPIN -> ParrotAction.SPIN_COOLDOWN_TICKS; case HAT, DEHAT -> ParrotAction.HAT_COOLDOWN_TICKS; case COLOR -> ParrotAction.COLOR_COOLDOWN_TICKS; case FREE, FREEFOLLOW, VIEW, DEVIEW, ARM, DEARM -> ParrotAction.SIMPLE_CONTROL_COOLDOWN_TICKS; case SCREAM -> c.scream(); case LOVE -> 40; case EXP -> ParrotAction.EXP_COOLDOWN_TICKS; default -> 0; };
+        return switch (action) { case COME -> c.come(); case FOLLOW -> c.follow(); case SIT -> c.sit(); case DANCE -> c.dance(); case SPIN -> ParrotAction.SPIN_COOLDOWN_TICKS; case HAT, DEHAT -> ParrotAction.HAT_COOLDOWN_TICKS; case COLOR -> ParrotAction.COLOR_COOLDOWN_TICKS; case NAME -> ParrotAction.NAME_COOLDOWN_TICKS; case FREE, FREEFOLLOW, VIEW, DEVIEW, ARM, DEARM -> ParrotAction.SIMPLE_CONTROL_COOLDOWN_TICKS; case SCREAM -> c.scream(); case LOVE -> 40; case EXP -> ParrotAction.EXP_COOLDOWN_TICKS; default -> 0; };
     }
 
     private static boolean dropExperienceBottle(ViewerParrotEntity parrot) {

@@ -8,7 +8,8 @@ import java.util.UUID;
 
 /** Typed values for the only actions requiring parameters; arbitrary executable JSON is never accepted. */
 public sealed interface ActionParameters permits ActionParameters.None, ActionParameters.Name,
-        ActionParameters.Trait, ActionParameters.Target, ActionParameters.Page, ActionParameters.Speech, ActionParameters.Color {
+        ActionParameters.Trait, ActionParameters.Target, ActionParameters.Page, ActionParameters.Speech, ActionParameters.Color,
+        ActionParameters.Nickname {
     boolean supports(ParrotAction action);
 
     enum None implements ActionParameters {
@@ -26,6 +27,10 @@ public sealed interface ActionParameters permits ActionParameters.None, ActionPa
     record Color(io.github.viewerparrots.domain.ParrotVariant variant) implements ActionParameters {
         public Color { Objects.requireNonNull(variant, "variant"); }
         @Override public boolean supports(ParrotAction action) { return action == ParrotAction.COLOR; }
+    }
+    /** Кличка для {@code !name Кеша}; {@code null} ({@code !name} без текста) возвращает имя зрителя. */
+    record Nickname(DisplayName nickname) implements ActionParameters {
+        @Override public boolean supports(ParrotAction action) { return action == ParrotAction.NAME; }
     }
     record Trait(ParrotTrait trait) implements ActionParameters {
         public Trait { Objects.requireNonNull(trait, "trait"); }

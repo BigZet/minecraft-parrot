@@ -37,7 +37,8 @@ public final class DtoMapper {
 
 			Viewer viewer = new Viewer(viewerId,
 					DisplayName.of(dto.viewer().displayName()),
-					dto.viewer().createdAt());
+					dto.viewer().createdAt(),
+					dto.viewer().nickname() == null ? null : DisplayName.of(dto.viewer().nickname()));
 
 			return new ViewerParrotRecord(
 					viewer,
@@ -78,7 +79,8 @@ public final class DtoMapper {
 				new SnapshotDto.ViewerDto(
 						record.viewerId().value(),
 						record.viewer().displayName().value(),
-						record.viewer().createdAt()),
+						record.viewer().createdAt(),
+						record.viewer().nicknameValue().map(DisplayName::value).orElse(null)),
 				record.incarnationId(),
 				record.generation(),
 				record.entityUuid(),

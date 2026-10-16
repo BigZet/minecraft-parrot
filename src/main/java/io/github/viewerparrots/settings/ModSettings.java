@@ -171,12 +171,31 @@ public record ModSettings(int schemaVersion, String activeProfile, Map<String, P
         }
     }
 
-    public record Moderation(int twitchQueueCapacity, int commandsPerTick, Set<String> blockedViewers, Set<String> mutedViewers) {
+    /** {@code forbiddenNameWords} — подстроки, запрещённые в кличке {@code !name}; сравнение без учёта регистра. */
+    public record Moderation(int twitchQueueCapacity, int commandsPerTick, Set<String> blockedViewers, Set<String> mutedViewers,
+                             Set<String> forbiddenNameWords) {
         public Moderation {
             range("twitchQueueCapacity", twitchQueueCapacity, 1, 4096);
             range("commandsPerTick", commandsPerTick, 1, 64);
             blockedViewers = viewers(blockedViewers);
             mutedViewers = viewers(mutedViewers);
+            range("forbiddenNameWords count", Objects.requireNonNull(forbiddenNameWords, "forbiddenNameWords").size(), 0, 1000);
+            var words = new java.util.LinkedHashSet<String>();
+            for (String word : forbiddenNameWords) {
+                String normalized = Objects.requireNonNull(word, "forbidden word").strip().toLowerCase(java.util.Locale.ROOT);
+                if (normalized.isEmpty() || normalized.length() > 64) throw new IllegalArgumentException("Forbidden name word must be 1-64 characters");
+                words.add(normalized);
+            }
+            forbiddenNameWords = Set.copyOf(words);
+        }
+        public Moderation(int twitchQueueCapacity, int commandsPerTick, Set<String> blockedViewers, Set<String> mutedViewers) {
+            this(twitchQueueCapacity, commandsPerTick, blockedViewers, mutedViewers, Set.of());
+        }
+        /** Кличка отклоняется, если содержит любое запрещённое слово как подстроку. */
+        public boolean allowsNickname(String nickname) {
+            String lower = nickname.toLowerCase(java.util.Locale.ROOT);
+            for (String word : forbiddenNameWords) if (lower.contains(word)) return false;
+            return true;
         }
     }
 
@@ -204,6 +223,7 @@ public record ModSettings(int schemaVersion, String activeProfile, Map<String, P
                 case SPIN -> ParrotAction.SPIN_COOLDOWN_TICKS;
                 case HAT, DEHAT -> ParrotAction.HAT_COOLDOWN_TICKS;
                 case COLOR -> ParrotAction.COLOR_COOLDOWN_TICKS;
+                case NAME -> ParrotAction.NAME_COOLDOWN_TICKS;
                 case EXP -> ParrotAction.EXP_COOLDOWN_TICKS;
                 case FREE, FREEFOLLOW, VIEW, DEVIEW, ARM, DEARM -> ParrotAction.SIMPLE_CONTROL_COOLDOWN_TICKS;
                 case LOVE -> 40;

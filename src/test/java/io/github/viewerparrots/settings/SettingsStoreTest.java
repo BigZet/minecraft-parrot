@@ -97,9 +97,17 @@ class SettingsStoreTest {
         var defaults = ModSettings.defaults();
         String json = SettingsStore.toJson(defaults);
         // Файл версии 1.1.0: блоков styleTags/traitTags ещё не было.
-        String legacy = json.replaceAll("(?s),\\s*\"styleTags\": \\{.*?\\}", "").replaceAll("(?s),\\s*\"traitTags\": \\{.*?\\}", "");
+        String legacy = json.replaceAll("(?s),\\s*\"styleTags\": \\{.*?\\}", "").replaceAll("(?s),\\s*\"traitTags\": \\{.*?\\}", "")
+                .replaceAll(",\\s*\"forbiddenNameWords\": \\[\\]", "");
         assertFalse(legacy.contains("styleTags"));
+        assertFalse(legacy.contains("forbiddenNameWords"));
         assertEquals(defaults, SettingsStore.parse(legacy));
+
+        var moderation = new ModSettings.Moderation(256, 4, java.util.Set.of(), java.util.Set.of(), java.util.Set.of(" Durak ", "xxx"));
+        assertTrue(moderation.allowsNickname("Кеша"));
+        assertFalse(moderation.allowsNickname("СуперDURAKов"));
+        assertFalse(moderation.allowsNickname("xXx"));
+        assertThrows(IllegalArgumentException.class, () -> new ModSettings.Moderation(256, 4, java.util.Set.of(), java.util.Set.of(), java.util.Set.of("")));
 
         var speech = defaults.active().speech();
         var custom = new java.util.LinkedHashMap<>(speech.styleTags());

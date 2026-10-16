@@ -432,6 +432,23 @@ public final class ViewerParrotService {
 	 * Command adapters wait for it before reporting terminal success. An I/O failure blocks
 	 * further mutations and cancels authoritative behavior through the degraded context.
 	 */
+	/** Durable-часть {@code !name}; {@code null} убирает кличку. Имя над птицей игровой путь уже обновил. */
+	public CompletableFuture<Void> recordNickname(ViewerId viewerId, DisplayName nickname) {
+		Optional<ViewerParrotRecord> existing = this.context.registry().find(viewerId);
+		if (existing.isEmpty()) {
+			return CompletableFuture.failedFuture(new IllegalStateException("viewer removed"));
+		}
+		if (java.util.Objects.equals(existing.get().viewer().nickname(), nickname)) return CompletableFuture.completedFuture(null);
+		UUID id = UUID.randomUUID();
+		return guarded(id, viewerId, "PERSIST_NICKNAME", () -> mutate(id, viewerId,
+				record -> record.withNickname(nickname, this.context.clock().now()),
+				"viewerparrots.action.ok", updated -> {})).thenApply(result -> {
+			if (!result.succeeded()) throw new java.util.concurrent.CompletionException(
+					new IllegalStateException(result.code().name()));
+			return null;
+		});
+	}
+
 	/** Durable-часть {@code !color}: права, cooldown и состояние уже проверены игровым путём команд. */
 	public CompletableFuture<Void> recordVariant(ViewerId viewerId, ParrotVariant variant) {
 		Optional<ViewerParrotRecord> existing = this.context.registry().find(viewerId);

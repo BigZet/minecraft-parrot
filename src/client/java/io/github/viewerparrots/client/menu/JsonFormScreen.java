@@ -183,6 +183,7 @@ abstract class JsonFormScreen extends MenuFormScreen {
             case "guest" -> "Обычный публичный чат можно читать без входа в Twitch.";
             case "blockedViewers" -> "Команды этих зрителей пропускаются. ID из списка «Попугаи», например twitch:123456; можно через запятую.";
             case "mutedViewers" -> "Отключает !say. ID из списка «Попугаи», например twitch:123456; можно через запятую. Другие команды остаются доступны.";
+            case "forbiddenNameWords" -> "Кличка из !name отклоняется, если содержит любую из этих подстрок (без учёта регистра); можно через запятую.";
             case "model" -> "Идентификатор модели озвучки OpenRouter. Текущая модель: elevenlabs/eleven-v4-turbo.";
             case "headMaxAngle" -> "Предельный поворот головы относительно тела в градусах.";
             case "headTurnThreshold" -> "При превышении этого угла птица начинает поворачивать тело.";
@@ -213,7 +214,7 @@ abstract class JsonFormScreen extends MenuFormScreen {
             Map.entry("hourlyRequests", "Запросов за час"), Map.entry("hourlyWords", "Слов за час"), Map.entry("voices", "Голоса"),
             Map.entry("spinDurationTicks", "Длительность !spin"), Map.entry("spinDegreesPerTick", "Скорость !spin"), Map.entry("freefollowRadius", "Радиус !freefollow"), Map.entry("freefollowReturnDistance", "Остановка возвращения"),
             Map.entry("headMaxAngle", "Максимальный угол головы"), Map.entry("headTurnThreshold", "Начинать поворот тела"),
-            Map.entry("twitchQueueCapacity", "Очередь Twitch"), Map.entry("commandsPerTick", "Команд за тик"), Map.entry("blockedViewers", "Блокировка по ID зрителя"), Map.entry("mutedViewers", "Без озвучки — ID зрителей"),
+            Map.entry("twitchQueueCapacity", "Очередь Twitch"), Map.entry("commandsPerTick", "Команд за тик"), Map.entry("blockedViewers", "Блокировка по ID зрителя"), Map.entry("mutedViewers", "Без озвучки — ID зрителей"), Map.entry("forbiddenNameWords", "Стоп-слова для кличек !name"),
             Map.entry("weight", "Вес категории"), Map.entry("color", "Цвет категории"), Map.entry("count", "Количество"), Map.entry("itemId", "Предмет")
     );
 

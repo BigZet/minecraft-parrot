@@ -167,10 +167,12 @@ public final class SettingsStore {
                 gameplay.requireDouble("freefollowRadius"), gameplay.requireDouble("freefollowReturnDistance"),
                 (float) gameplay.requireDouble("headMaxAngle"), (float) gameplay.requireDouble("headTurnThreshold"));
         JsonView moderation = view.requireObject("moderation");
-        moderation.requireKnownFields("twitchQueueCapacity", "commandsPerTick", "blockedViewers", "mutedViewers");
+        moderation.requireKnownFields("twitchQueueCapacity", "commandsPerTick", "blockedViewers", "mutedViewers", "forbiddenNameWords");
         var moderationSettings = new ModSettings.Moderation(moderation.requireInt("twitchQueueCapacity"),
                 moderation.requireInt("commandsPerTick"), Set.copyOf(moderation.requireStringArray("blockedViewers")),
-                Set.copyOf(moderation.requireStringArray("mutedViewers")));
+                Set.copyOf(moderation.requireStringArray("mutedViewers")),
+                // Файлы версии 1.1.0 ещё не знают о запрещённых словах клички.
+                moderation.has("forbiddenNameWords") ? Set.copyOf(moderation.requireStringArray("forbiddenNameWords")) : Set.of());
         return new ModSettings.Profile(view.requireString("name"), general, commands, speechSettings,
                 roulette, gameplaySettings, moderationSettings);
     }

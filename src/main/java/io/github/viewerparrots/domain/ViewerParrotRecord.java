@@ -90,6 +90,11 @@ public record ViewerParrotRecord(
 		return bump(now).withViewer(this.viewer.withDisplayName(newName));
 	}
 
+	/** {@code null} убирает кличку: над птицей снова имя зрителя. */
+	public ViewerParrotRecord withNickname(DisplayName nickname, Instant now) {
+		return bump(now).withViewer(this.viewer.withNickname(nickname));
+	}
+
 	public ViewerParrotRecord withVariant(ParrotVariant newVariant, Instant now) {
 		ViewerParrotRecord bumped = bump(now);
 		return new ViewerParrotRecord(bumped.viewer, bumped.incarnationId, bumped.generation,

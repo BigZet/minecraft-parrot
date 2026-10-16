@@ -56,11 +56,12 @@ public final class SnapshotCodec {
 				"updatedAt", "revision");
 
 		JsonView viewerView = view.requireObject("viewer");
-		viewerView.requireKnownFields("viewerId", "displayName", "createdAt");
+		viewerView.requireKnownFields("viewerId", "displayName", "createdAt", "nickname");
 		SnapshotDto.ViewerDto viewer = new SnapshotDto.ViewerDto(
 				viewerView.requireString("viewerId"),
 				viewerView.requireString("displayName"),
-				viewerView.requireInstant("createdAt"));
+				viewerView.requireInstant("createdAt"),
+				viewerView.optionalString("nickname").orElse(null));
 
 		SnapshotDto.LocationDto location = null;
 		if (view.has("lastKnownLocation")) {
@@ -135,6 +136,7 @@ public final class SnapshotCodec {
 		viewer.addProperty("viewerId", record.viewer().viewerId());
 		viewer.addProperty("displayName", record.viewer().displayName());
 		viewer.addProperty("createdAt", record.viewer().createdAt().toString());
+		if (record.viewer().nickname() != null) viewer.addProperty("nickname", record.viewer().nickname());
 		json.add("viewer", viewer);
 
 		json.addProperty("incarnationId", record.incarnationId().toString());

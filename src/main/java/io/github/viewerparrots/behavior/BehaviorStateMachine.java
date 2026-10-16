@@ -36,6 +36,7 @@ public final class BehaviorStateMachine {
 		COMMAND_HAT,
 		COMMAND_DEHAT,
 		COMMAND_COLOR,
+		COMMAND_NAME,
 		COMMAND_SCREAM,
 		COMMAND_LOVE,
 		COMMAND_EXP,
@@ -126,7 +127,7 @@ public final class BehaviorStateMachine {
 					: accepted(current, desired);
 
 			// Звук, сердечки и пузырёк опыта состояние не меняют.
-			case COMMAND_SCREAM, COMMAND_LOVE, COMMAND_EXP, COMMAND_ROULETTE, COMMAND_HAT, COMMAND_DEHAT, COMMAND_COLOR,
+			case COMMAND_SCREAM, COMMAND_LOVE, COMMAND_EXP, COMMAND_ROULETTE, COMMAND_HAT, COMMAND_DEHAT, COMMAND_COLOR, COMMAND_NAME,
 					COMMAND_VIEW, COMMAND_DEVIEW -> accepted(current, desired);
 
 			case ARRIVAL_REACHED, MOVEMENT_TIMEOUT -> current == BehaviorState.RETURNING

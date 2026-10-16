@@ -108,6 +108,18 @@ class TwitchCommandInboxTest {
         assertTrue(TwitchCommandInbox.command(message("5", "!colors", "color-lookalike"), "streamer").isEmpty());
     }
 
+    @Test void nameSetsOrClearsTheNicknameAndRejectsInvalidNames() {
+        var set = TwitchCommandInbox.command(message("7", "!name  Кеша Великий ", "name-set"), "streamer").orElseThrow();
+        assertEquals(ParrotAction.NAME, set.action());
+        assertEquals("Кеша Великий", ((ActionParameters.Nickname) set.parameters()).nickname().value());
+        var clear = TwitchCommandInbox.command(message("7", "!NAME", "name-clear"), "streamer").orElseThrow();
+        assertEquals(ParrotAction.NAME, clear.action());
+        assertNull(((ActionParameters.Nickname) clear.parameters()).nickname());
+        assertTrue(TwitchCommandInbox.command(message("7", "!name §cКеша", "name-section"), "streamer").isEmpty());
+        assertTrue(TwitchCommandInbox.command(message("7", "!name " + "а".repeat(33), "name-long"), "streamer").isEmpty());
+        assertTrue(TwitchCommandInbox.command(message("7", "!names Кеша", "name-lookalike"), "streamer").isEmpty());
+    }
+
     @Test void ignoresEmptySpeechAndCommandPrefixLookalikes() {
         for (String text : new String[]{"!say", "!SAY   ", "!say\u2003\u00a0", "!saying Hello", "!sayHello", "!say [\u0437\u043b\u043e]", "!say [\u0437\u043b\u043e]   "})
             assertTrue(TwitchCommandInbox.command(message("123", text, "empty-speech"), "streamer").isEmpty());
