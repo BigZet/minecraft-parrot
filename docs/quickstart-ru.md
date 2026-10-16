@@ -3,7 +3,7 @@
 Эта инструкция подходит для нового компьютера. Мод устанавливает только стример:
 зрителям достаточно Twitch-чата. Нужна Minecraft **Java Edition 1.21.1**.
 
-Быстрее всего — `viewerparrots-1.1.0-installer.zip` из релиза: он сам ставит
+Быстрее всего — `viewerparrots-1.2.0-installer.zip` из релиза: он сам ставит
 Prism Launcher, Fabric и мод (см. `ИНСТРУКЦИЯ.txt` внутри архива). Ниже — ручной путь.
 
 ## 1. Подготовьте Minecraft
@@ -22,7 +22,7 @@ Prism Launcher, Fabric и мод (см. `ИНСТРУКЦИЯ.txt` внутри 
 ## 2. Установите готовый мод
 
 Откройте [последний релиз Viewer Parrots](https://github.com/BigZet/minecraft-parrot/releases/latest)
-и скачайте из **Assets** файл **`viewerparrots-1.1.0.jar`**.
+и скачайте из **Assets** файл **`viewerparrots-1.2.0.jar`**.
 Архивы `Source code` для обычной установки не нужны.
 
 Можно скачать готовый ZIP-пакет из того же релиза: внутри находится JAR
@@ -35,7 +35,7 @@ Fabric API нужно добавить отдельно.
 
 ```text
 mods/
-  viewerparrots-1.1.0.jar
+  viewerparrots-1.2.0.jar
   fabric-api-0.116.17+1.21.1.jar
 ```
 

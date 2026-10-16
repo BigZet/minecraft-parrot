@@ -1,4 +1,4 @@
-# Viewer Parrots 1.1.0 🦜
+# Viewer Parrots 1.2.0 🦜
 
 Fabric-мод для одиночной игры в Minecraft **1.21.1**: зрители Twitch создают
 своих попугаев и управляют ими командами в чате. У птиц есть шляпы, реальные
@@ -25,7 +25,7 @@ Fabric-мод для одиночной игры в Minecraft **1.21.1**: зри
 
 ## Установка одним файлом
 
-Для стримера без опыта с модами: скачайте `viewerparrots-1.1.0-installer.zip`
+Для стримера без опыта с модами: скачайте `viewerparrots-1.2.0-installer.zip`
 из [GitHub Releases](https://github.com/BigZet/minecraft-parrot/releases/latest),
 распакуйте и запустите **«Установить Viewer Parrots.cmd»**. Установщик ставит
 portable Prism Launcher в `%LOCALAPPDATA%\ViewerParrots`, создаёт инстанс
@@ -43,12 +43,12 @@ Minecraft 1.21.1 + Fabric, кладёт Fabric API и мод, записывае
 | Java | 21 |
 | Fabric Loader | 0.19.5 |
 | Fabric API | 0.116.17+1.21.1 |
-| Viewer Parrots | 1.1.0 |
+| Viewer Parrots | 1.2.0 |
 
 1. Установите [Prism Launcher](https://prismlauncher.org/download/), добавьте
    Minecraft-инстанс **1.21.1** и установите в него **Fabric Loader 0.19.5**.
    Для запуска выберите Java 21.
-2. Скачайте `viewerparrots-1.1.0.jar` из
+2. Скачайте `viewerparrots-1.2.0.jar` из
    [GitHub Releases](https://github.com/BigZet/minecraft-parrot/releases/latest).
    Положите его и [Fabric API](https://modrinth.com/mod/fabric-api)
    **0.116.17+1.21.1** в папку `mods` этого инстанса.
@@ -237,7 +237,7 @@ Minecraft 1.21.1 + Fabric, кладёт Fabric API и мод, записывае
 ./gradlew assemble --console=plain
 ```
 
-Результат: `build/libs/viewerparrots-1.1.0.jar`.
+Результат: `build/libs/viewerparrots-1.2.0.jar`.
 Обычная проверка проекта — одна сборка и короткий прогон изменённого сценария.
 Дополнительные тесты доступны через `scripts/verify.ps1 -Extended`.
 

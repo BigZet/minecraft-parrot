@@ -3,7 +3,7 @@
     JAR мода из build/libs и Fabric API с Modrinth (проверяется по SHA-512 из API).
 #>
 param(
-    [string]$Version = '1.1.0',
+    [string]$Version = '1.2.0',
     [string]$FabricApiVersion = '0.116.17+1.21.1'
 )
 $ErrorActionPreference = 'Stop'

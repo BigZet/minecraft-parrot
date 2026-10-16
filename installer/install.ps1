@@ -24,7 +24,7 @@ $ProgressPreference = 'SilentlyContinue'
 try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch { }
 
 # ---- Версии: меняются вместе с релизом -------------------------------------
-$ModVersion       = '1.1.0'
+$ModVersion       = '1.2.0'
 $MinecraftVersion = '1.21.1'
 $FabricLoader     = '0.19.5'
 $FabricApiJar     = 'fabric-api-0.116.17+1.21.1.jar'
