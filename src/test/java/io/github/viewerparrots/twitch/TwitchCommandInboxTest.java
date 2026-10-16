@@ -85,8 +85,19 @@ class TwitchCommandInboxTest {
         }
     }
 
+    @Test void speechStyleComesOnlyFromTheLeadingBracketToken() {
+        var styled = (ActionParameters.Speech) TwitchCommandInbox.command(message("123", "!say [\u0428\u0451\u043f\u043e\u0442] \u0442\u0438\u0445\u043e-\u0442\u0438\u0445\u043e", "style"), "streamer").orElseThrow().parameters();
+        assertEquals("\u0448\u0435\u043f\u043e\u0442", styled.style());
+        assertEquals("\u0442\u0438\u0445\u043e-\u0442\u0438\u0445\u043e", styled.text());
+        var unknown = (ActionParameters.Speech) TwitchCommandInbox.command(message("123", "!say [\u0432\u0435\u0441\u0435\u043b\u043e] \u043f\u0440\u0438\u0432\u0435\u0442", "unknown"), "streamer").orElseThrow().parameters();
+        assertEquals("\u0432\u0435\u0441\u0435\u043b\u043e", unknown.style());
+        var inline = (ActionParameters.Speech) TwitchCommandInbox.command(message("123", "!say \u043f\u0440\u0438\u0432\u0435\u0442 [\u0448\u0451\u043f\u043e\u0442]", "inline"), "streamer").orElseThrow().parameters();
+        assertNull(inline.style());
+        assertEquals("\u043f\u0440\u0438\u0432\u0435\u0442 [\u0448\u0451\u043f\u043e\u0442]", inline.text());
+    }
+
     @Test void ignoresEmptySpeechAndCommandPrefixLookalikes() {
-        for (String text : new String[]{"!say", "!SAY   ", "!say\u2003\u00a0", "!saying Hello", "!sayHello"})
+        for (String text : new String[]{"!say", "!SAY   ", "!say\u2003\u00a0", "!saying Hello", "!sayHello", "!say [\u0437\u043b\u043e]", "!say [\u0437\u043b\u043e]   "})
             assertTrue(TwitchCommandInbox.command(message("123", text, "empty-speech"), "streamer").isEmpty());
     }
 

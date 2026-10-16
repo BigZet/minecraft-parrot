@@ -258,6 +258,17 @@ public final class ControlPanelScreen extends JsonFormScreen {
         heading("Озвучка !say");
         for (String key : speech.keySet()) if (!key.equals("voices")) field(profilePath() + ".speech." + key);
         if (dashboard != null) info("Потрачено за час", dashboard.hourlyRequests() + " запросов / " + dashboard.hourlyWords() + " слов");
+        heading("Интонации — !say [стиль] текст");
+        info("Тег ElevenLabs", "Латиницей в квадратных скобках, например [whispers] или [excited, loud]. Пусто — без тега.");
+        JsonObject styleTags = speech.getAsJsonObject("styleTags");
+        if (styleTags != null) for (String style : styleTags.keySet()) {
+            field(profilePath() + ".speech.styleTags." + style, "[" + style + "]", "Зритель пишет !say [" + style + "] текст.");
+        }
+        heading("Тег по характеру птицы — когда стиль не указан");
+        JsonObject traitTags = speech.getAsJsonObject("traitTags");
+        if (traitTags != null) for (String trait : traitTags.keySet()) {
+            field(profilePath() + ".speech.traitTags." + trait, enumLabel(trait), "Характер назначается при создании птицы.");
+        }
         Row key = row("Новый ключ OpenRouter", "Ключ скрыт и сохраняется отдельно от профиля. Текущий ключ не читается и не показывается.");
         if (key != null) {
             TextFieldWidget field = textInput(key, openRouterKey, 512, value -> openRouterKey = value);

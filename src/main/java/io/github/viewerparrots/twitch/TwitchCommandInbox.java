@@ -62,7 +62,7 @@ public final class TwitchCommandInbox {
         try {
             ActionParameters parameters = action == ParrotAction.CREATE
                     ? new ActionParameters.Name(DisplayName.of(message.displayName()))
-                    : speech ? new ActionParameters.Speech(text.substring(4)) : ActionParameters.None.INSTANCE;
+                    : speech ? ActionParameters.Speech.parse(text.substring(4)) : ActionParameters.None.INSTANCE;
             UUID commandId = message.messageId() == null || message.messageId().isEmpty() ? UUID.randomUUID()
                     : UUID.nameUUIDFromBytes(("twitch-message:" + message.messageId()).getBytes(StandardCharsets.UTF_8));
             return Optional.of(new CommandRequest(commandId, ViewerId.of("twitch:" + message.userId()), action, parameters));

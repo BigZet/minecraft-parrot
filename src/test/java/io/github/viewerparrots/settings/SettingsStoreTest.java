@@ -100,7 +100,8 @@ class SettingsStoreTest {
                 gameplay.freefollowRadius(), gameplay.freefollowReturnDistance(), 75, 75));
         var speech = profile.speech();
         assertThrows(IllegalArgumentException.class, () -> new ModSettings.Speech(true, speech.model(), 30,
-                60, 16, 0, 0, java.util.List.of(speech.voices().getFirst(), speech.voices().getFirst())));
+                60, 16, 0, 0, java.util.List.of(speech.voices().getFirst(), speech.voices().getFirst()),
+                speech.styleTags(), speech.traitTags()));
     }
 
     private static ModSettings.Profile renamed(ModSettings.Profile original, String name) {

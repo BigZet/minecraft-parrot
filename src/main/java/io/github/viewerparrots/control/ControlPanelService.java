@@ -190,7 +190,7 @@ public final class ControlPanelService {
                 case CREATE, RENAME -> new ActionParameters.Name(DisplayName.of(argument.isBlank() ? "Тестовый попугай" : argument));
                 case TRAIT -> new ActionParameters.Trait(ParrotTrait.valueOf(argument));
                 case SETSTREAMER -> new ActionParameters.Target(owner.getId());
-                case SAY -> new ActionParameters.Speech(argument);
+                case SAY -> ActionParameters.Speech.parse(argument);
                 default -> ActionParameters.None.INSTANCE;
             };
             return context.api().submit(new CommandRequest(UUID.randomUUID(), viewer, kind, parameters), actor)

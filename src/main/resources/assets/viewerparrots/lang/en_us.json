@@ -32,6 +32,7 @@
   "viewerparrots.error.target_unavailable": "Streamer is offline or dead",
   "viewerparrots.error.speech_not_configured": "Parrot speech is not configured",
   "viewerparrots.error.speech_failed": "Could not generate or play parrot speech",
+  "viewerparrots.error.speech_unknown_style": "Unknown !say [style]; available styles are listed in F8 → Speech",
   "viewerparrots.error.parrot_entity_missing": "Physical instance not found",
   "viewerparrots.error.entity_unresolved": "Instance state not yet determined",
   "viewerparrots.error.entity_already_loaded": "Instance is already loaded",

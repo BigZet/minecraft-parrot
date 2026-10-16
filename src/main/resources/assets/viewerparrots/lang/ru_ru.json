@@ -32,6 +32,7 @@
   "viewerparrots.error.target_unavailable": "Стример не в сети или мёртв",
   "viewerparrots.error.speech_not_configured": "Речь попугаев не настроена",
   "viewerparrots.error.speech_failed": "Не удалось создать или воспроизвести речь попугая",
+  "viewerparrots.error.speech_unknown_style": "Неизвестный стиль !say [стиль]; доступные стили — в F8 → Озвучка",
   "viewerparrots.error.parrot_entity_missing": "Физический экземпляр не найден",
   "viewerparrots.error.entity_unresolved": "Состояние экземпляра ещё не установлено",
   "viewerparrots.error.entity_already_loaded": "Экземпляр уже загружен",

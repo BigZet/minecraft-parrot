@@ -148,9 +148,10 @@ public final class ParrotSpeechService implements AutoCloseable {
     public int pendingCount() { return pending.size(); }
 
     public CompletableFuture<CommandResult> say(UUID commandId, ViewerId viewer, String rawText) {
-        return say(commandId, io.github.viewerparrots.api.ActorContext.console(4), viewer, rawText);
+        return say(commandId, io.github.viewerparrots.api.ActorContext.console(4), viewer, io.github.viewerparrots.api.ActionParameters.Speech.parse(rawText));
     }
-    public CompletableFuture<CommandResult> say(UUID commandId, io.github.viewerparrots.api.ActorContext actor, ViewerId viewer, String rawText) {
+    public CompletableFuture<CommandResult> say(UUID commandId, io.github.viewerparrots.api.ActorContext actor, ViewerId viewer,
+                                                io.github.viewerparrots.api.ActionParameters.Speech speech) {
         if (!context.server().isOnThread()) throw new IllegalStateException("speech submission must use the server thread");
         var access = io.github.viewerparrots.settings.CommandAccess.evaluate(actor, ParrotAction.SAY, viewer);
         if (!access.allowed()) return reject(commandId, io.github.viewerparrots.settings.CommandAccess.error(access));
@@ -174,8 +175,18 @@ public final class ParrotSpeechService implements AutoCloseable {
         var decision = context.rateLimiter().check(ParrotAction.SAY);
         if (!decision.allowed()) return CompletableFuture.completedFuture(CommandResult.retryLater(commandId, ErrorCode.GLOBAL_RATE_LIMITED, decision.retryAfterTicks()));
 
-        String text = SpeechText.firstWords(rawText, speechSettings.maxWords());
         ViewerParrotRecord identity = maybeRecord.get();
+        // Явный [стиль] перекрывает тег характера; текст зрителя теряет свои скобки и не несёт тегов.
+        String tag = speech.style() == null ? SpeechStyle.traitTag(speechSettings.traitTags(), identity.trait())
+                : SpeechStyle.tagFor(speechSettings.styleTags(), speech.style());
+        if (tag == null) return reject(commandId, ErrorCode.SPEECH_UNKNOWN_STYLE);
+        String text;
+        try {
+            text = SpeechText.firstWords(SpeechStyle.sanitize(speech.text()), speechSettings.maxWords());
+        } catch (IllegalArgumentException empty) {
+            return reject(commandId, ErrorCode.INVALID_ARGUMENT);
+        }
+        String spoken = SpeechStyle.compose(tag, text);
         String voice = voices.assign(identity.incarnationId());
         UUID entityId = entity.getUuid();
         UUID listenerId = listener.get().getUuid();
@@ -199,7 +210,7 @@ public final class ParrotSpeechService implements AutoCloseable {
                         var usage = io.github.viewerparrots.control.ControlPanelService.usage();
                         if (usage == null) throw new IllegalStateException("Usage unavailable");
                         if (usage.record(SpeechText.wordCount(text), speechSettings.hourlyRequests(), speechSettings.hourlyWords()))
-                            pcm = acceptedClient.synthesize(voice, text, speechSettings.model(), speechSettings.timeoutSeconds());
+                            pcm = acceptedClient.synthesize(voice, spoken, speechSettings.model(), speechSettings.timeoutSeconds());
                         else failureCode = ErrorCode.SPEECH_LIMIT_REACHED;
                     }
                     catch (Exception failure) {

@@ -195,7 +195,7 @@ public final class ViewerParrotCommands {
 	private static int say(CommandContext<ServerCommandSource> ctx, String rawViewerId, String text) {
 		return withViewerId(ctx, rawViewerId, (context, source, viewerId) -> {
 			try {
-				return submit(context, source, viewerId, ParrotAction.SAY, new ActionParameters.Speech(text), null);
+				return submit(context, source, viewerId, ParrotAction.SAY, ActionParameters.Speech.parse(text), null);
 			} catch (IllegalArgumentException invalidText) {
 				source.sendError(errorText(ErrorCode.INVALID_ARGUMENT, invalidText.getMessage()));
 				return 0;

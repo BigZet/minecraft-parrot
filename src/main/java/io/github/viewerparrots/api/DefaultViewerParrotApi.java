@@ -99,7 +99,7 @@ public final class DefaultViewerParrotApi implements ViewerParrotApi {
                 CommandResult initial = context.commandService().submit(id, actor, request.action(), viewer);
                 yield initial.status() == CommandStatus.ACCEPTED ? context.commandService().completion(id) : CompletableFuture.completedFuture(initial);
             }
-            case SAY -> context.speechService().say(id, actor, viewer, ((ActionParameters.Speech) request.parameters()).text());
+            case SAY -> context.speechService().say(id, actor, viewer, (ActionParameters.Speech) request.parameters());
             case RELOAD -> context.reload(id, actor);
             case SAVE -> {
                 if (!context.allowsMutations()) yield rejected(request, ErrorCode.STORAGE_UNAVAILABLE);

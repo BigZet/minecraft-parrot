@@ -24,6 +24,8 @@ public enum ErrorCode {
 	TARGET_UNAVAILABLE,
 	SPEECH_NOT_CONFIGURED,
 	SPEECH_FAILED,
+	/** {@code !say [стиль]} с неизвестным стилем; фраза не озвучивается. */
+	SPEECH_UNKNOWN_STYLE,
 
 	PARROT_ENTITY_MISSING,
 	ENTITY_UNRESOLVED,

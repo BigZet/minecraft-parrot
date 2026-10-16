@@ -120,6 +120,14 @@ public final class SettingsStore {
         return new ModSettings(1, "default", Map.of("default", profile), twitch);
     }
 
+    private static Map<String, String> tags(JsonView speech, String field, Map<String, String> defaults) {
+        var object = speech.optionalObject(field);
+        if (object.isEmpty()) return defaults;
+        var tags = new LinkedHashMap<String, String>();
+        for (String key : object.get().fieldNames()) tags.put(key, object.get().requireString(key));
+        return tags;
+    }
+
     private static ModSettings.Profile profile(JsonView view) {
         view.requireKnownFields("name", "general", "commands", "speech", "roulette", "gameplay", "moderation");
         ViewerParrotsConfig general = new ConfigLoader(ConfigValidator.withoutRegistry())
@@ -140,7 +148,8 @@ public final class SettingsStore {
                     rule.requireBoolean("enabled"), roles(rule, "roles"), rule.requireInt("cooldownTicks"), roleCooldowns));
         }
         JsonView speech = view.requireObject("speech");
-        speech.requireKnownFields("enabled", "model", "maxWords", "timeoutSeconds", "queueCapacity", "hourlyRequests", "hourlyWords", "voices");
+        speech.requireKnownFields("enabled", "model", "maxWords", "timeoutSeconds", "queueCapacity", "hourlyRequests", "hourlyWords", "voices",
+                "styleTags", "traitTags");
         var voices = new ArrayList<ModSettings.Voice>();
         for (JsonView voice : speech.requireObjectArray("voices")) {
             voice.requireKnownFields("id", "name", "enabled");
@@ -148,7 +157,10 @@ public final class SettingsStore {
         }
         var speechSettings = new ModSettings.Speech(speech.requireBoolean("enabled"), speech.requireString("model"),
                 speech.requireInt("maxWords"), speech.requireInt("timeoutSeconds"), speech.requireInt("queueCapacity"),
-                speech.requireInt("hourlyRequests"), speech.requireInt("hourlyWords"), voices);
+                speech.requireInt("hourlyRequests"), speech.requireInt("hourlyWords"), voices,
+                // Файлы версии 1.1.0 не знают об интонациях: без полей действуют теги по умолчанию.
+                tags(speech, "styleTags", io.github.viewerparrots.speech.SpeechStyle.DEFAULT_STYLE_TAGS),
+                tags(speech, "traitTags", io.github.viewerparrots.speech.SpeechStyle.DEFAULT_TRAIT_TAGS));
         JsonView gameplay = view.requireObject("gameplay");
         gameplay.requireKnownFields("spinDurationTicks", "spinDegreesPerTick", "freefollowRadius", "freefollowReturnDistance", "headMaxAngle", "headTurnThreshold");
         var gameplaySettings = new ModSettings.Gameplay(gameplay.requireInt("spinDurationTicks"), gameplay.requireDouble("spinDegreesPerTick"),

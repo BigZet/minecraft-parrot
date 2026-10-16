@@ -83,7 +83,9 @@ public record ModSettings(int schemaVersion, String activeProfile, Map<String, P
                 voices.add(new Voice(VoiceAssignments.DEFAULT_VOICES.get(i), "Голос " + (i + 1), true));
             }
             return new Profile("По умолчанию", general, Map.of(),
-                    new Speech(true, "elevenlabs/eleven-v4-turbo", 30, 60, 16, 0, 0, voices), roulette,
+                    new Speech(true, "elevenlabs/eleven-v4-turbo", 30, 60, 16, 0, 0, voices,
+                            io.github.viewerparrots.speech.SpeechStyle.DEFAULT_STYLE_TAGS,
+                            io.github.viewerparrots.speech.SpeechStyle.DEFAULT_TRAIT_TAGS), roulette,
                     new Gameplay(60, 180.0, 12.0, 8.0, 75.0f, 75.0f),
                     new Moderation(256, 4, Set.of(), Set.of()));
         }
@@ -117,9 +119,16 @@ public record ModSettings(int schemaVersion, String activeProfile, Map<String, P
         }
     }
 
+    /**
+     * {@code styleTags} — интонации {@code !say [стиль]}: ключ стиля → тег ElevenLabs;
+     * {@code traitTags} — тег по характеру птицы (имя {@code ParrotTrait}), когда стиль не указан.
+     */
     public record Speech(boolean enabled, String model, int maxWords, int timeoutSeconds, int queueCapacity,
-                         int hourlyRequests, int hourlyWords, List<Voice> voices) {
+                         int hourlyRequests, int hourlyWords, List<Voice> voices,
+                         Map<String, String> styleTags, Map<String, String> traitTags) {
         public Speech {
+            styleTags = io.github.viewerparrots.speech.SpeechStyle.validatedTags(styleTags, "speech styleTags", false);
+            traitTags = io.github.viewerparrots.speech.SpeechStyle.validatedTags(traitTags, "speech traitTags", true);
             model = Objects.requireNonNull(model, "model").strip();
             if (!model.matches("[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.:-]+") || model.length() > 128) {
                 throw new IllegalArgumentException("Speech model must be an OpenRouter model ID");

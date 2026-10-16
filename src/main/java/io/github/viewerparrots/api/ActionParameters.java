@@ -34,8 +34,23 @@ public sealed interface ActionParameters permits ActionParameters.None, ActionPa
         public Page { if (page < 1) throw new IllegalArgumentException("page must be at least one"); }
         @Override public boolean supports(ParrotAction action) { return action == ParrotAction.LIST; }
     }
-    record Speech(String text) implements ActionParameters {
-        public Speech { text = SpeechText.firstWords(text, 200); }
+    /** {@code style} — ключ интонации из {@code !say [стиль] текст} или {@code null}; проверяется службой речи. */
+    record Speech(String text, String style) implements ActionParameters {
+        public Speech {
+            text = SpeechText.firstWords(text, 200);
+            if (style != null) {
+                style = io.github.viewerparrots.speech.SpeechStyle.normalizeKey(style);
+                if (style.length() > io.github.viewerparrots.speech.SpeechStyle.MAX_STYLE_LENGTH) {
+                    style = style.substring(0, io.github.viewerparrots.speech.SpeechStyle.MAX_STYLE_LENGTH);
+                }
+            }
+        }
+        public Speech(String text) { this(text, null); }
+        /** Разбирает необязательный {@code [стиль]} в начале реплики. */
+        public static Speech parse(String raw) {
+            var parsed = io.github.viewerparrots.speech.SpeechStyle.parse(raw);
+            return new Speech(parsed.text(), parsed.style());
+        }
         @Override public boolean supports(ParrotAction action) { return action == ParrotAction.SAY; }
     }
 }
