@@ -93,6 +93,29 @@ class SettingsStoreTest {
         assertThrows(IllegalArgumentException.class, () -> store.exportProfile(settings.active(), "../outside.json"));
     }
 
+    @Test void settingsWithoutSpeechTagsGetDefaultsAndCustomTagsRoundTrip() {
+        var defaults = ModSettings.defaults();
+        String json = SettingsStore.toJson(defaults);
+        // Файл версии 1.1.0: блоков styleTags/traitTags ещё не было.
+        String legacy = json.replaceAll("(?s),\\s*\"styleTags\": \\{.*?\\}", "").replaceAll("(?s),\\s*\"traitTags\": \\{.*?\\}", "");
+        assertFalse(legacy.contains("styleTags"));
+        assertEquals(defaults, SettingsStore.parse(legacy));
+
+        var speech = defaults.active().speech();
+        var custom = new java.util.LinkedHashMap<>(speech.styleTags());
+        custom.put("пират", "[gruff, pirate accent]");
+        var changed = new ModSettings.Speech(speech.enabled(), speech.model(), speech.maxWords(), speech.timeoutSeconds(),
+                speech.queueCapacity(), speech.hourlyRequests(), speech.hourlyWords(), speech.voices(), custom, java.util.Map.of());
+        var profile = defaults.active();
+        var settings = new ModSettings(1, "default", java.util.Map.of("default", new ModSettings.Profile(profile.name(), profile.general(),
+                profile.commands(), changed, profile.roulette(), profile.gameplay(), profile.moderation())), defaults.twitch());
+        var reloaded = SettingsStore.parse(SettingsStore.toJson(settings)).active().speech();
+        assertEquals("[gruff, pirate accent]", reloaded.styleTags().get("пират"));
+        assertEquals("[whispers]", reloaded.styleTags().get("шёпот"));
+        assertTrue(reloaded.traitTags().isEmpty());
+        assertThrows(IllegalArgumentException.class, () -> SettingsStore.parse(SettingsStore.toJson(settings).replace("[gruff, pirate accent]", "gruff")));
+    }
+
     @Test void rejectsNonFiniteGameplayAndDuplicateVoiceIds() {
         var profile = ModSettings.Profile.defaults();
         var gameplay = profile.gameplay();
