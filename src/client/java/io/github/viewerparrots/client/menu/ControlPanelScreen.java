@@ -525,6 +525,7 @@ public final class ControlPanelScreen extends JsonFormScreen {
             case "DEHAT" -> "Снять шляпу";
             case "COLOR" -> "Сменить окрас на случайный другой";
             case "NAME" -> "Кличка птицы (!name Текст; !name — убрать)";
+            case "EMOTE" -> "Случайная эмоция: поклон, нет, кивок, прыжок";
             case "EXP" -> "Разбить пузырёк опыта у птицы";
             case "ROULETTE" -> "Разыграть предмет";
             default -> name;

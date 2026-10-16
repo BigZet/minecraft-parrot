@@ -58,6 +58,10 @@ public class ViewerParrotEntity extends ParrotEntity {
 			DataTracker.registerData(ViewerParrotEntity.class, TrackedDataHandlerRegistry.LONG);
 	private static final TrackedData<String> HAT_ID =
 			DataTracker.registerData(ViewerParrotEntity.class, TrackedDataHandlerRegistry.STRING);
+	private static final TrackedData<String> EMOTE_ID =
+			DataTracker.registerData(ViewerParrotEntity.class, TrackedDataHandlerRegistry.STRING);
+	private static final TrackedData<Long> EMOTE_STARTED_AT =
+			DataTracker.registerData(ViewerParrotEntity.class, TrackedDataHandlerRegistry.LONG);
 	private static final TrackedData<Boolean> VIEWING_STREAMER =
 			DataTracker.registerData(ViewerParrotEntity.class, TrackedDataHandlerRegistry.BOOLEAN);
 
@@ -108,7 +112,7 @@ public class ViewerParrotEntity extends ParrotEntity {
 	@Override protected BodyControl createBodyControl() { return new ViewingBodyControl(this); }
 
 	public boolean isFreeFlightEnabled() {
-		if (getWorld().isClient() || isForcedDancing() || isSpinning()) return false;
+		if (getWorld().isClient() || isForcedDancing() || isSpinning() || isEmoting()) return false;
 		ServerContext context = ServerContext.current().orElse(null);
 		ViewerId id = context == null ? null : context.loadedIndex().findViewerId(getUuid()).orElse(null);
 		var runtime = id == null ? null : context.runtimes().get(id);
@@ -166,6 +170,8 @@ public class ViewerParrotEntity extends ParrotEntity {
 		builder.add(SPIN_STARTED_AT, -1L);
 		builder.add(HAT_ID, "");
 		builder.add(VIEWING_STREAMER, false);
+		builder.add(EMOTE_ID, "");
+		builder.add(EMOTE_STARTED_AT, -1L);
 	}
 
 	// --- Маркер реестра (раздел 4.3 ТЗ) --------------------------------------
@@ -287,6 +293,30 @@ public class ViewerParrotEntity extends ParrotEntity {
 		if (!isSpinning()) return 0.0f;
 		return (float) ((this.getWorld().getTime() - this.dataTracker.get(SPIN_STARTED_AT) + tickDelta)
 				* ControlPanelService.settings().active().gameplay().spinDegreesPerTick());
+	}
+
+	// --- Эмоции !emote: как спин, синхронизируется только старт, клиент интерполирует по своим часам ---
+
+	public void startEmote(String emoteId) {
+		if (this.getWorld().isClient()) throw new IllegalStateException("Emote starts on the server");
+		if (!io.github.viewerparrots.cosmetic.ParrotEmotes.isKnown(emoteId)) throw new IllegalArgumentException("Unknown parrot emote");
+		this.dataTracker.set(EMOTE_ID, emoteId);
+		this.dataTracker.set(EMOTE_STARTED_AT, this.getWorld().getTime());
+	}
+
+	public String emoteId() { return this.dataTracker.get(EMOTE_ID); }
+
+	public boolean isEmoting() {
+		long started = this.dataTracker.get(EMOTE_STARTED_AT);
+		long elapsed = this.getWorld().getTime() - started;
+		return started >= 0 && elapsed >= 0 && elapsed < io.github.viewerparrots.cosmetic.ParrotEmotes.DURATION_TICKS;
+	}
+
+	/** 0 в начале эмоции, 1 в конце; вне эмоции — 0. */
+	public float getEmoteProgress(float tickDelta) {
+		if (!isEmoting()) return 0.0f;
+		float elapsed = (float) (this.getWorld().getTime() - this.dataTracker.get(EMOTE_STARTED_AT)) + tickDelta;
+		return Math.min(1.0f, elapsed / io.github.viewerparrots.cosmetic.ParrotEmotes.DURATION_TICKS);
 	}
 
 	@Override public int getMaxHeadRotation() {

@@ -38,6 +38,21 @@ class BehaviorStateMachineTest {
 	}
 
 	@Test
+	void emoteBehavesLikeSpinIncludingShoulderRejection() {
+		Event emote = Event.valueOf("COMMAND_EMOTE");
+		for (DesiredBehavior desired : DesiredBehavior.values()) {
+			Accepted result = accepted(desired.toBehaviorState(), desired, emote);
+			assertEquals(desired.toBehaviorState(), result.behavior());
+			assertTrue(result.cancellations().isEmpty());
+		}
+		for (BehaviorState current : new BehaviorState[]{BehaviorState.RETURNING, BehaviorState.DANCING, BehaviorState.SHOULDER}) {
+			Rejected rejected = assertInstanceOf(Rejected.class,
+					BehaviorStateMachine.apply(current, DesiredBehavior.FREEFOLLOW, emote));
+			assertEquals(ErrorCode.INVALID_STATE, rejected.code());
+		}
+	}
+
+	@Test
 	void spinPreservesStableBehaviorAndRejectsOverlappingTransientActions() {
 		Event spin = Event.valueOf("COMMAND_SPIN");
 		for (DesiredBehavior desired : DesiredBehavior.values()) {

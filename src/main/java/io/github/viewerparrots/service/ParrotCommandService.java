@@ -173,6 +173,10 @@ public final class ParrotCommandService {
         long remaining = this.context.cooldowns().remainingTicks(viewerId, cooldownKey(action));
         if (remaining > 0) return CommandResult.retryLater(commandId, ErrorCode.COMMAND_ON_COOLDOWN, remaining);
 
+        // Spin and emote are short exclusive animations; the shoulder is rejected by the state machine (SHOULDER is transient).
+        if ((action == ParrotAction.EMOTE || action == ParrotAction.SPIN) && (parrot.isSpinning() || parrot.isEmoting())) {
+            return CommandResult.rejected(commandId, ErrorCode.INVALID_STATE);
+        }
         if (action == ParrotAction.NAME && parameters instanceof ActionParameters.Nickname nick && nick.nickname() != null
                 && !io.github.viewerparrots.control.ControlPanelService.settings().active().moderation().allowsNickname(nick.nickname().value())) {
             return CommandResult.rejected(commandId, ErrorCode.INVALID_ARGUMENT);
@@ -282,6 +286,19 @@ public final class ParrotCommandService {
                 parrot.getNavigation().stop();
                 parrot.setVelocity(parrot.getVelocity().multiply(0.0, 1.0, 0.0));
                 parrot.startSpin();
+            }
+            case EMOTE -> {
+                String emote = pending.parameters instanceof ActionParameters.Emote explicit ? explicit.id()
+                        : io.github.viewerparrots.cosmetic.ParrotEmotes.random(this.context.behaviorRandom());
+                runtime.cancelAutonomousMovement();
+                parrot.getNavigation().stop();
+                parrot.setVelocity(parrot.getVelocity().multiply(0.0, 1.0, 0.0));
+                parrot.startEmote(emote);
+                if (io.github.viewerparrots.cosmetic.ParrotEmotes.HOP.equals(emote)) {
+                    // A real jump: the vanilla flying pose flaps the wings, gravity brings the bird back.
+                    parrot.setVelocity(parrot.getVelocity().x, 0.42, parrot.getVelocity().z);
+                    parrot.velocityModified = true;
+                }
             }
             case DANCE -> {
                 runtime.startDance(commandId, this.context.clock().currentTick() + this.context.config().dance().durationTicks());
@@ -480,7 +497,7 @@ public final class ParrotCommandService {
 
     private static boolean requiresTarget(ParrotAction action) { return action == ParrotAction.COME || action == ParrotAction.FOLLOW || action == ParrotAction.FREEFOLLOW || action == ParrotAction.ARM || action == ParrotAction.VIEW || action == ParrotAction.ROULETTE; }
     private static boolean preservesBehavior(ParrotAction action) { return CommandPolicy.preservesBehavior(action); }
-    private static boolean isGameAction(ParrotAction action) { return switch (action) { case COME, FOLLOW, FREE, FREEFOLLOW, VIEW, DEVIEW, ARM, DEARM, SIT, DANCE, SPIN, HAT, DEHAT, COLOR, NAME, SCREAM, LOVE, EXP, ROULETTE -> true; default -> false; }; }
+    private static boolean isGameAction(ParrotAction action) { return switch (action) { case COME, FOLLOW, FREE, FREEFOLLOW, VIEW, DEVIEW, ARM, DEARM, SIT, DANCE, SPIN, HAT, DEHAT, COLOR, NAME, EMOTE, SCREAM, LOVE, EXP, ROULETTE -> true; default -> false; }; }
     private static ParrotAction cooldownKey(ParrotAction action) { return CommandPolicy.cooldownKey(action); }
     private static BehaviorStateMachine.Event toEvent(ParrotAction action) {
         return switch (action) {
@@ -499,6 +516,7 @@ public final class ParrotCommandService {
             case DEHAT -> BehaviorStateMachine.Event.COMMAND_DEHAT;
             case COLOR -> BehaviorStateMachine.Event.COMMAND_COLOR;
             case NAME -> BehaviorStateMachine.Event.COMMAND_NAME;
+            case EMOTE -> BehaviorStateMachine.Event.COMMAND_EMOTE;
             case SCREAM -> BehaviorStateMachine.Event.COMMAND_SCREAM;
             case LOVE -> BehaviorStateMachine.Event.COMMAND_LOVE;
             case EXP -> BehaviorStateMachine.Event.COMMAND_EXP;
@@ -508,7 +526,7 @@ public final class ParrotCommandService {
     }
     private long cooldownFor(ParrotAction action) {
         var c = this.context.config().cooldowns();
-        return switch (action) { case COME -> c.come(); case FOLLOW -> c.follow(); case SIT -> c.sit(); case DANCE -> c.dance(); case SPIN -> ParrotAction.SPIN_COOLDOWN_TICKS; case HAT, DEHAT -> ParrotAction.HAT_COOLDOWN_TICKS; case COLOR -> ParrotAction.COLOR_COOLDOWN_TICKS; case NAME -> ParrotAction.NAME_COOLDOWN_TICKS; case FREE, FREEFOLLOW, VIEW, DEVIEW, ARM, DEARM -> ParrotAction.SIMPLE_CONTROL_COOLDOWN_TICKS; case SCREAM -> c.scream(); case LOVE -> 40; case EXP -> ParrotAction.EXP_COOLDOWN_TICKS; default -> 0; };
+        return switch (action) { case COME -> c.come(); case FOLLOW -> c.follow(); case SIT -> c.sit(); case DANCE -> c.dance(); case SPIN -> ParrotAction.SPIN_COOLDOWN_TICKS; case HAT, DEHAT -> ParrotAction.HAT_COOLDOWN_TICKS; case COLOR -> ParrotAction.COLOR_COOLDOWN_TICKS; case NAME -> ParrotAction.NAME_COOLDOWN_TICKS; case EMOTE -> ParrotAction.EMOTE_COOLDOWN_TICKS; case FREE, FREEFOLLOW, VIEW, DEVIEW, ARM, DEARM -> ParrotAction.SIMPLE_CONTROL_COOLDOWN_TICKS; case SCREAM -> c.scream(); case LOVE -> 40; case EXP -> ParrotAction.EXP_COOLDOWN_TICKS; default -> 0; };
     }
 
     private static boolean dropExperienceBottle(ViewerParrotEntity parrot) {

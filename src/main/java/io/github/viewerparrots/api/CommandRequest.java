@@ -10,7 +10,7 @@ public record CommandRequest(UUID commandId, ViewerId viewerId, ParrotAction act
         Objects.requireNonNull(action, "action");
         Objects.requireNonNull(parameters, "parameters");
         boolean scoped = switch (action) {
-            case CREATE, REMOVE, RESPAWN, RENAME, TRAIT, RECONCILE, INFO, COME, FOLLOW, FREE, FREEFOLLOW, VIEW, DEVIEW, ARM, DEARM, SIT, DANCE, SPIN, SCREAM, SAY, LOVE, HAT, DEHAT, COLOR, NAME, EXP, ROULETTE -> true;
+            case CREATE, REMOVE, RESPAWN, RENAME, TRAIT, RECONCILE, INFO, COME, FOLLOW, FREE, FREEFOLLOW, VIEW, DEVIEW, ARM, DEARM, SIT, DANCE, SPIN, SCREAM, SAY, LOVE, HAT, DEHAT, COLOR, NAME, EMOTE, EXP, ROULETTE -> true;
             default -> false;
         };
         if (scoped && viewerId == null) throw new IllegalArgumentException("viewerId is required for " + action);

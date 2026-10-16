@@ -9,7 +9,7 @@ import java.util.UUID;
 /** Typed values for the only actions requiring parameters; arbitrary executable JSON is never accepted. */
 public sealed interface ActionParameters permits ActionParameters.None, ActionParameters.Name,
         ActionParameters.Trait, ActionParameters.Target, ActionParameters.Page, ActionParameters.Speech, ActionParameters.Color,
-        ActionParameters.Nickname {
+        ActionParameters.Nickname, ActionParameters.Emote {
     boolean supports(ParrotAction action);
 
     enum None implements ActionParameters {
@@ -31,6 +31,13 @@ public sealed interface ActionParameters permits ActionParameters.None, ActionPa
     /** Кличка для {@code !name Кеша}; {@code null} ({@code !name} без текста) возвращает имя зрителя. */
     record Nickname(DisplayName nickname) implements ActionParameters {
         @Override public boolean supports(ParrotAction action) { return action == ParrotAction.NAME; }
+    }
+    /** Явная эмоция для {@code !emote поклон}; {@code !emote} без аргумента идёт с {@link None} и выбирает случайную. */
+    record Emote(String id) implements ActionParameters {
+        public Emote {
+            if (!io.github.viewerparrots.cosmetic.ParrotEmotes.isKnown(id)) throw new IllegalArgumentException("Unknown parrot emote");
+        }
+        @Override public boolean supports(ParrotAction action) { return action == ParrotAction.EMOTE; }
     }
     record Trait(ParrotTrait trait) implements ActionParameters {
         public Trait { Objects.requireNonNull(trait, "trait"); }

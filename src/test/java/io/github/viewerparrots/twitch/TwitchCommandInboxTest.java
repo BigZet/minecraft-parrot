@@ -108,6 +108,15 @@ class TwitchCommandInboxTest {
         assertTrue(TwitchCommandInbox.command(message("5", "!colors", "color-lookalike"), "streamer").isEmpty());
     }
 
+    @Test void emoteIsRandomWithoutArgumentAndNamedWithOne() {
+        var random = TwitchCommandInbox.command(message("9", "!emote", "emote-random"), "streamer").orElseThrow();
+        assertEquals(ParrotAction.EMOTE, random.action());
+        assertSame(ActionParameters.None.INSTANCE, random.parameters());
+        var named = TwitchCommandInbox.command(message("9", "!Emote Поклон", "emote-named"), "streamer").orElseThrow();
+        assertEquals("bow", ((ActionParameters.Emote) named.parameters()).id());
+        assertTrue(TwitchCommandInbox.command(message("9", "!emote танец", "emote-unknown"), "streamer").isEmpty());
+    }
+
     @Test void nameSetsOrClearsTheNicknameAndRejectsInvalidNames() {
         var set = TwitchCommandInbox.command(message("7", "!name  Кеша Великий ", "name-set"), "streamer").orElseThrow();
         assertEquals(ParrotAction.NAME, set.action());

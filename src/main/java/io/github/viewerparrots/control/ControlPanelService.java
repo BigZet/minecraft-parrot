@@ -192,6 +192,8 @@ public final class ControlPanelService {
                 case SETSTREAMER -> new ActionParameters.Target(owner.getId());
                 case SAY -> ActionParameters.Speech.parse(argument);
                 case NAME -> new ActionParameters.Nickname(argument.isBlank() ? null : DisplayName.of(argument));
+                case EMOTE -> argument.isBlank() ? ActionParameters.None.INSTANCE
+                        : new ActionParameters.Emote(io.github.viewerparrots.cosmetic.ParrotEmotes.parse(argument).orElse(argument));
                 default -> ActionParameters.None.INSTANCE;
             };
             return context.api().submit(new CommandRequest(UUID.randomUUID(), viewer, kind, parameters), actor)

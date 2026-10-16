@@ -37,6 +37,7 @@ public final class BehaviorStateMachine {
 		COMMAND_DEHAT,
 		COMMAND_COLOR,
 		COMMAND_NAME,
+		COMMAND_EMOTE,
 		COMMAND_SCREAM,
 		COMMAND_LOVE,
 		COMMAND_EXP,
@@ -121,8 +122,9 @@ public final class BehaviorStateMachine {
 					? new Rejected(ErrorCode.INVALID_STATE)
 					: accepted(BehaviorState.DANCING, desired);
 
-			// A short visual spin pauses movement without replacing the saved behavior.
-			case COMMAND_SPIN -> current.isTransient()
+			// A short visual spin or emote pauses movement without replacing the saved behavior.
+			// Transient states (shoulder, dance, returning) reject them: no nested animation stack.
+			case COMMAND_SPIN, COMMAND_EMOTE -> current.isTransient()
 					? new Rejected(ErrorCode.INVALID_STATE)
 					: accepted(current, desired);
 

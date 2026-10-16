@@ -158,6 +158,7 @@ public final class ViewerParrotCommands {
 				.then(gameAction("dehat", ParrotAction.DEHAT))
 				.then(gameAction("color", ParrotAction.COLOR))
 				.then(gameAction("name", ParrotAction.NAME))
+				.then(gameAction("emote", ParrotAction.EMOTE))
 				.then(gameAction("exp", ParrotAction.EXP))
 				.then(gameAction("roulette", ParrotAction.ROULETTE))
 

@@ -43,8 +43,9 @@ public final class TwitchCommandInbox {
         String argument = words.length > 1 ? words[1].strip() : "";
         boolean colorCommand = words[0].equalsIgnoreCase("!color");
         boolean nameCommand = words[0].equalsIgnoreCase("!name");
+        boolean emoteCommand = words[0].equalsIgnoreCase("!emote");
         ParrotAction action = speech ? ParrotAction.SAY : colorCommand ? ParrotAction.COLOR : nameCommand ? ParrotAction.NAME
-                : switch (text.toLowerCase(Locale.ROOT)) {
+                : emoteCommand ? ParrotAction.EMOTE : switch (text.toLowerCase(Locale.ROOT)) {
             case "!parrot" -> ParrotAction.CREATE;
             case "!come" -> ParrotAction.COME;
             case "!follow" -> ParrotAction.FOLLOW;
@@ -75,6 +76,10 @@ public final class TwitchCommandInbox {
                 var variant = io.github.viewerparrots.cosmetic.ParrotColors.parse(argument);
                 if (variant.isEmpty()) return Optional.empty();
                 parameters = new ActionParameters.Color(variant.get());
+            } else if (emoteCommand && !argument.isEmpty()) {
+                var emote = io.github.viewerparrots.cosmetic.ParrotEmotes.parse(argument);
+                if (emote.isEmpty()) return Optional.empty();
+                parameters = new ActionParameters.Emote(emote.get());
             } else if (nameCommand) {
                 // Пустой !name убирает кличку; недопустимое имя (§, управляющие, >32 символов) — не команда.
                 parameters = new ActionParameters.Nickname(argument.isEmpty() ? null : DisplayName.of(argument));
