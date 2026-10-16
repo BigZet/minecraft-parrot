@@ -23,7 +23,19 @@ Fabric-мод для одиночной игры в Minecraft **1.21.1**: зри
 один раз. Время рулетки и другие интервалы редактируются в секундах.
 [Установка и подключение с нуля](docs/quickstart-ru.md).
 
-## Быстрая установка
+## Установка одним файлом
+
+Для стримера без опыта с модами: скачайте `viewerparrots-1.1.0-installer.zip`
+из [GitHub Releases](https://github.com/BigZet/minecraft-parrot/releases/latest),
+распакуйте и запустите **«Установить Viewer Parrots.cmd»**. Установщик ставит
+portable Prism Launcher в `%LOCALAPPDATA%\ViewerParrots`, создаёт инстанс
+Minecraft 1.21.1 + Fabric, кладёт Fabric API и мод, записывает Twitch-канал
+и создаёт ярлык на рабочем столе; Java 21 и Minecraft Prism скачивает сам.
+Остаётся войти в Microsoft-аккаунт. Пошагово — в [installer/ИНСТРУКЦИЯ.txt](installer/ИНСТРУКЦИЯ.txt);
+исходник — [installer/install.ps1](installer/install.ps1), сборка архива —
+`scripts/package-installer.ps1`.
+
+## Установка вручную
 
 | Компонент | Версия |
 |---|---|

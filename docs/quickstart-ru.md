@@ -3,6 +3,9 @@
 Эта инструкция подходит для нового компьютера. Мод устанавливает только стример:
 зрителям достаточно Twitch-чата. Нужна Minecraft **Java Edition 1.21.1**.
 
+Быстрее всего — `viewerparrots-1.1.0-installer.zip` из релиза: он сам ставит
+Prism Launcher, Fabric и мод (см. `ИНСТРУКЦИЯ.txt` внутри архива). Ниже — ручной путь.
+
 ## 1. Подготовьте Minecraft
 
 Рекомендуемый вариант — [Prism Launcher](https://prismlauncher.org/download/).
