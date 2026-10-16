@@ -26,8 +26,6 @@ import net.minecraft.test.TestContext;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 
-import java.io.IOException;
-import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -105,9 +103,8 @@ public final class ContractsGameTests implements FabricGameTest {
         void successful(CommandResult result, String action) { test.assertTrue(result.succeeded(), action + ": " + result); }
         JsonObject candidate() { return JsonParser.parseString(ConfigLoader.toJson(context.config())).getAsJsonObject(); }
         CommandResult reload(JsonObject json) {
-            try { Files.writeString(context.configFile(), json.toString()); }
-            catch (IOException error) { throw new IllegalStateException(error); }
-            return FixtureCallbacks.finish(context.server(), context.reload(UUID.randomUUID(), ADMIN));
+            SettingsFixture.writeGeneral(json);
+            return SettingsFixture.reload(context, ADMIN);
         }
         void observe(ParrotEvent event) {
             if (!event.viewerId().equals(id)) return;
@@ -119,8 +116,7 @@ public final class ContractsGameTests implements FabricGameTest {
         }
 
         void start() {
-            try { originalConfig = Files.readString(context.configFile()); }
-            catch (IOException error) { throw new IllegalStateException(error); }
+            originalConfig = SettingsFixture.snapshot();
             for (int x = -10; x <= 26; x++) for (int z = -10; z <= 18; z++) {
                 test.getWorld().setBlockState(test.getAbsolutePos(new BlockPos(x, 1, z)), Blocks.STONE.getDefaultState());
             }
@@ -146,8 +142,7 @@ public final class ContractsGameTests implements FabricGameTest {
         }
 
         void reentrantAcceptance() {
-            try { originalConfig = Files.readString(context.configFile()); }
-            catch (IOException error) { throw new IllegalStateException(error); }
+            originalConfig = SettingsFixture.snapshot();
             for (int x = -10; x <= 26; x++) for (int z = -10; z <= 18; z++) {
                 test.getWorld().setBlockState(test.getAbsolutePos(new BlockPos(x, 1, z)), Blocks.STONE.getDefaultState());
             }
@@ -290,7 +285,8 @@ public final class ContractsGameTests implements FabricGameTest {
             long before = namedCount();
             test.assertTrue(before == 0, "Reload queues names instead of refreshing synchronously");
             context.refreshNames();
-            test.assertTrue(changedNames(beforeNames) == 10, "Exactly ten global loaded names refreshed in first batch");
+            long firstBatch = changedNames(beforeNames);
+            test.assertTrue(firstBatch == 10, "Exactly ten global loaded names refreshed in first batch: changed=" + firstBatch);
             int batches = (beforeNames.size() + 9) / 10;
             for (int batch = 1; batch < batches; batch++) {
                 Map<ViewerId, String> previousNames = allNames();
@@ -360,17 +356,19 @@ public final class ContractsGameTests implements FabricGameTest {
                 var priorPermissions = context.permissions();
                 JsonObject invalid = candidate();
                 invalid.addProperty("nameFormat", "Invalid partial name");
-                invalid.getAsJsonObject("sound").getAsJsonArray("allowedSounds").add("minecraft:this_sound_does_not_exist");
+                invalid.getAsJsonObject("sound").addProperty("volume", 5.0);
                 CommandResult rejected = reload(invalid);
-                test.assertTrue(rejected.code() == ErrorCode.CONFIG_INVALID, "Unknown registry sound rejects reload");
+                test.assertTrue(rejected.code() == ErrorCode.CONFIG_INVALID, "Invalid settings file rejects reload: " + rejected);
                 test.assertTrue(context.config() == previous && context.soundService() == priorSounds && context.permissions() == priorPermissions,
                         "Invalid reload preserves entire active configuration and service references");
-                test.assertTrue(rejected.details().get("detail").contains("$.sound.allowedSounds"), "Invalid reload identifies JSON path");
+                // Since 1.1.0 cold worker settings stay as loaded; hot settings still apply and the panel reports a pending restart.
                 JsonObject restart = candidate();
                 restart.addProperty("nameFormat", "Restart partial name");
                 restart.getAsJsonObject("limits").addProperty("queueCapacity", previous.limits().queueCapacity() == 128 ? 64 : 128);
-                test.assertTrue(reload(restart).code() == ErrorCode.CONFIG_RESTART_REQUIRED, "Queue capacity requires restart");
-                test.assertTrue(context.config() == previous, "Restart-only reload rejects runtime changes atomically");
+                successful(reload(restart), "queue capacity change reload");
+                test.assertTrue(context.settingsRestartRequired() && context.config().limits().queueCapacity() == previous.limits().queueCapacity()
+                                && context.config().nameFormat().equals("Restart partial name"),
+                        "Queue capacity waits for restart while hot settings apply");
                 test.waitAndRun(82, () -> run(this::preserveLazyDeadlineAndCancel));
             });
         }
@@ -516,11 +514,9 @@ public final class ContractsGameTests implements FabricGameTest {
                 test.getWorld().getServer().getPlayerManager().remove(streamer);
             }
             if (originalConfig == null) return;
-            try {
-                Files.writeString(context.configFile(), originalConfig);
-                CommandResult restored = FixtureCallbacks.finish(context.server(), context.reload(UUID.randomUUID(), ADMIN));
-                if (!restored.succeeded()) throw new IllegalStateException("Test could not restore original config: " + restored);
-            } catch (IOException error) { throw new IllegalStateException(error); }
+            SettingsFixture.write(originalConfig);
+            CommandResult restored = SettingsFixture.reload(context, ADMIN);
+            if (!restored.succeeded()) throw new IllegalStateException("Test could not restore original config: " + restored);
         }
     }
 }

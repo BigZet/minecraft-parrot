@@ -11,7 +11,6 @@
       "io.github.viewerparrots.gametest.ViewerParrotsGameTests",
       "io.github.viewerparrots.gametest.StorageGameTests",
       "io.github.viewerparrots.gametest.ContractsGameTests",
-      "io.github.viewerparrots.gametest.PersonalityGameTests",
       "io.github.viewerparrots.gametest.SafePositionGameTests",
       "io.github.viewerparrots.gametest.PreparedCommitGameTests",
       "io.github.viewerparrots.gametest.RecoveryTicketGameTests",

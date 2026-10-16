@@ -5,7 +5,6 @@ import io.github.viewerparrots.api.CommandResult;
 import io.github.viewerparrots.api.CommandStatus;
 import io.github.viewerparrots.api.ParrotAction;
 import io.github.viewerparrots.bootstrap.ServerContext;
-import io.github.viewerparrots.config.ConfigLoader;
 import io.github.viewerparrots.config.DeathMode;
 import io.github.viewerparrots.config.ViewerParrotsConfig;
 import io.github.viewerparrots.diagnostics.ErrorCode;
@@ -36,8 +35,6 @@ import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.GameMode;
 import net.minecraft.world.World;
 
-import java.io.IOException;
-import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -73,8 +70,7 @@ public final class AcceptanceScenarioGameTests implements FabricGameTest {
         Scenario(TestContext test) {
             this.test = test;
             origin = Vec3d.ofBottomCenter(test.getAbsolutePos(new BlockPos(4, 3, 4)));
-            try { originalFile = Files.readString(context.configFile()); }
-            catch (IOException failure) { throw new IllegalStateException(failure); }
+            originalFile = SettingsFixture.snapshot();
         }
 
         void start() {
@@ -127,7 +123,8 @@ public final class AcceptanceScenarioGameTests implements FabricGameTest {
                         .thenApply(result -> new TimedResult(result, context.clock().currentTick()));
                 await(timedCompletion, completed -> {
                     success(completed.result(), "COME from sixteen blocks");
-                    check(completed.tick() - acceptedAt <= 200, "Near COME completes within 200 actual server ticks");
+                    check(completed.tick() - acceptedAt <= 200, "Near COME completes within 200 actual server ticks: took="
+                            + (completed.tick() - acceptedAt) + " result=" + completed.result());
                     check(parrot().squaredDistanceTo(target) <= 9.0001, "Near COME physically reaches its arrival radius");
                     long danceAcceptedAt = context.clock().currentTick();
                     UUID dance = begin(ParrotAction.DANCE);
@@ -426,14 +423,12 @@ public final class AcceptanceScenarioGameTests implements FabricGameTest {
                     new ViewerParrotsConfig.Behavior(false, b.idleMinTicks(), b.idleMaxTicks(), b.dangerCheckTicks(), b.dangerRadius(),
                             b.lazyMinTicks(), b.lazyMaxTicks(), b.normalSoundChance(), b.loudSoundChance(), b.traitWeights()),
                     original.limits(), original.recovery(), original.storage());
-            try { Files.writeString(context.configFile(), ConfigLoader.toJson(candidate)); }
-            catch (IOException failure) { throw new IllegalStateException(failure); }
-            success(FixtureCallbacks.finish(context.server(), context.reload(UUID.randomUUID(), actor)), "Reload scenario configuration");
+            SettingsFixture.writeGeneral(candidate);
+            success(SettingsFixture.reload(context, actor), "Reload scenario configuration");
         }
         void restoreConfig() {
-            try { Files.writeString(context.configFile(), originalFile); }
-            catch (IOException failure) { throw new IllegalStateException(failure); }
-            FixtureCallbacks.finish(context.server(), context.reload(UUID.randomUUID(), actor));
+            SettingsFixture.write(originalFile);
+            SettingsFixture.reload(context, actor);
         }
         <T> void await(CompletableFuture<T> future, Consumer<T> next) {
             if (future.isDone()) guard(() -> next.accept(future.join()));

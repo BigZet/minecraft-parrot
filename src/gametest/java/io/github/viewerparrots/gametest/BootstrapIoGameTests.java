@@ -1,6 +1,5 @@
 package io.github.viewerparrots.gametest;
 
-import com.google.gson.JsonParser;
 import io.github.viewerparrots.api.*;
 import io.github.viewerparrots.bootstrap.FabricLifecycleAdapter;
 import io.github.viewerparrots.bootstrap.ServerContext;
@@ -18,7 +17,6 @@ import net.minecraft.util.math.Vec3d;
 import net.minecraft.block.Blocks;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.entity.Entity;
-import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -29,11 +27,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
-/** Actual read gates contain only latches and strings; worker hooks never touch a world or TestContext. */
+/**
+ * Actual read gates contain only latches and strings; worker hooks never touch a world or TestContext.
+ * Since 1.1.0 settings come from ControlPanelService, so the only bootstrap read on the storage writer is the registry.
+ */
 public final class BootstrapIoGameTests implements FabricGameTest {
     private static final ActorContext ADMIN = ActorContext.console(4);
     private static final AtomicReference<Observation> OBSERVATION = new AtomicReference<>();
-    public static void beforeConfigIo() { beforeIo("config"); }
     public static void beforeRegistryIo() { beforeIo("registry"); }
     private static void beforeIo(String kind) {
         Observation observation = OBSERVATION.get();
@@ -57,10 +57,6 @@ public final class BootstrapIoGameTests implements FabricGameTest {
     @GameTest(batchId = "bootstrap-io", templateName = EMPTY_STRUCTURE, tickLimit = 12000)
     public void loadingDefersExactSavedIdentityAndKeepsServerTicksRunning(TestContext test) {
         Scenario scenario = new Scenario(test); scenario.guard(scenario::bootstrap);
-    }
-    @GameTest(batchId = "reload-io", templateName = EMPTY_STRUCTURE, tickLimit = 12000)
-    public void reloadIsAtomicNonblockingAndCannotPublishAfterContextStops(TestContext test) {
-        Scenario scenario = new Scenario(test); scenario.guard(scenario::reload);
     }
 
     @GameTest(batchId = "shutdown-ingress", templateName = EMPTY_STRUCTURE, tickLimit = 12000)
@@ -115,7 +111,6 @@ public final class BootstrapIoGameTests implements FabricGameTest {
         final TestContext test;
         final List<Observation> gates = new ArrayList<>();
         ServerContext context;
-        String originalConfig;
         ViewerId fixtureId;
         ViewerParrotEntity fixture;
         Scenario(TestContext test) { this.test = test; context = ServerContext.current().orElseThrow(); }
@@ -134,7 +129,7 @@ public final class BootstrapIoGameTests implements FabricGameTest {
                 fixture.refreshPositionAndAngles(pos.getX() + .5, pos.getY(), pos.getZ() + .5, 0, 0);
                 check(test.getWorld().spawnEntity(fixture), "Exact fixture UUID is loaded");
                 ServerContext.stop(test.getWorld().getServer());
-                Observation observation = observe("config");
+                Observation observation = observe("registry");
                 context = restart();
                 check(context.storageHealth() == ServerContext.StorageHealth.LOADING,
                         "Starting returns LOADING without synchronously reading files");
@@ -144,13 +139,13 @@ public final class BootstrapIoGameTests implements FabricGameTest {
                     check(rejected.code() == ErrorCode.STORAGE_UNAVAILABLE, "LOADING explicitly blocks mutations");
                     until(() -> observation.entered.getCount() == 0, () -> later(5, () -> {
                         check(context.storageHealth() == ServerContext.StorageHealth.LOADING,
-                                "Five game ticks run while configuration I/O is blocked");
+                                "Five game ticks run while registry I/O is blocked");
                         observation.release.countDown();
                         until(() -> context.storageHealth() != ServerContext.StorageHealth.LOADING, () -> {
                             check(context.allowsMutations(), "Asynchronous registry callback publishes READY");
                             check(observation.reads.contains("registry:viewerparrots-storage")
                                             && observation.reads.stream().allMatch(read -> read.endsWith(":viewerparrots-storage")),
-                                    "Both configuration and registry reads use the one writer thread");
+                                    "Registry reads use the one writer thread");
                             check(context.loadedIndex().find(fixtureId).orElseThrow() == fixture && !fixture.isAiDisabled()
                                             && fixture.marker().orElseThrow().matches(context.registry().find(fixtureId).orElseThrow()),
                                     "READY revalidates the exact deferred identity before enabling AI");
@@ -165,7 +160,7 @@ public final class BootstrapIoGameTests implements FabricGameTest {
         }
         void stopDuringLoading() {
             ServerContext.stop(test.getWorld().getServer());
-            Observation observation = observe("config");
+            Observation observation = observe("registry");
             ServerContext retired = restart();
             check(retired.storageHealth() == ServerContext.StorageHealth.LOADING, "Second initialization starts asynchronously");
             until(() -> observation.entered.getCount() == 0, () -> {
@@ -180,55 +175,6 @@ public final class BootstrapIoGameTests implements FabricGameTest {
                 });
             });
         }
-        void reload() {
-            until(() -> context.storageHealth() != ServerContext.StorageHealth.LOADING, () -> {
-                try { originalConfig = Files.readString(context.configFile()); }
-                catch (Exception error) { throw new IllegalStateException(error); }
-                var before = context.config();
-                var json = JsonParser.parseString(originalConfig).getAsJsonObject();
-                json.addProperty("nameFormat", "async {viewer_name}"); writeConfig(json.toString());
-                Observation observation = observe("config");
-                CompletableFuture<CommandResult> work = submitReload();
-                AtomicReference<Boolean> callbackOnServer = new AtomicReference<>();
-                work.thenAccept(result -> callbackOnServer.set(test.getWorld().getServer().isOnThread()));
-                check(!work.isDone(), "Reload returns a pending future instead of reading files in the game tick");
-                until(() -> observation.entered.getCount() == 0, () -> {
-                    await(submitReload(), rejected -> {
-                        check(rejected.code() == ErrorCode.OPERATION_PENDING, "Concurrent reload is bounded");
-                        later(5, () -> {
-                            check(context.config() == before && !work.isDone(), "Five ticks run with the old immutable config while read is blocked");
-                            observation.release.countDown();
-                            await(work, result -> {
-                                check(result.succeeded() && context.config().nameFormat().equals("async {viewer_name}"), "Valid config publishes atomically after I/O");
-                                check(Boolean.TRUE.equals(callbackOnServer.get())
-                                                && observation.reads.stream().allMatch(read -> read.equals("config:viewerparrots-storage")),
-                                        "Reload reads on writer and completes on server thread");
-                                OBSERVATION.set(null); staleReload();
-                            });
-                        });
-                    });
-                });
-            });
-        }
-        void staleReload() {
-            ServerContext retired = context; var before = context.config();
-            var json = JsonParser.parseString(originalConfig).getAsJsonObject();
-            json.addProperty("nameFormat", "retired {viewer_name}"); writeConfig(json.toString());
-            Observation observation = observe("config");
-            CompletableFuture<CommandResult> work = submitReload();
-            until(() -> observation.entered.getCount() == 0, () -> {
-                observation.release.countDown(); ServerContext.stop(test.getWorld().getServer());
-                check(work.isDone() && work.getNow(null).code() == ErrorCode.INVALID_STATE && retired.config() == before,
-                        "Delayed reload cannot publish after its context stops");
-                OBSERVATION.set(null); writeConfig(originalConfig); context = restart();
-                until(() -> context.storageHealth() != ServerContext.StorageHealth.LOADING, () -> {
-                    check(context.allowsMutations() && context.config().nameFormat().equals(
-                            JsonParser.parseString(originalConfig).getAsJsonObject().get("nameFormat").getAsString()), "New context loads its own restored config");
-                    finish();
-                });
-            });
-        }
-
         void shutdownIngress() {
             until(() -> context.storageHealth() != ServerContext.StorageHealth.LOADING, () -> {
                 for (int x = -10; x <= 10; x++) for (int z = -10; z <= 10; z++)
@@ -277,13 +223,7 @@ public final class BootstrapIoGameTests implements FabricGameTest {
                 });
             });
         }
-        CompletableFuture<CommandResult> submitReload() {
-            return context.api().submit(new CommandRequest(UUID.randomUUID(), null, ParrotAction.RELOAD, ActionParameters.None.INSTANCE), ADMIN).toCompletableFuture();
-        }
         Observation observe(String kind) { Observation value = new Observation(kind); gates.add(value); OBSERVATION.set(value); return value; }
-        void writeConfig(String json) {
-            try { Files.writeString(context.configFile(), json); } catch (Exception error) { throw new IllegalStateException(error); }
-        }
         ServerContext restart() {
             try {
                 var method = FabricLifecycleAdapter.class.getDeclaredMethod("onServerStarted", net.minecraft.server.MinecraftServer.class);
@@ -302,8 +242,6 @@ public final class BootstrapIoGameTests implements FabricGameTest {
                 if (fixture != null) fixture.discard();
                 ServerContext.current().ifPresent(active -> {
                     if (fixtureId != null) active.registry().remove(fixtureId, active.clock().now());
-                    if (originalConfig != null) try { Files.writeString(active.configFile(), originalConfig); }
-                    catch (Exception restoreFailure) { error.addSuppressed(restoreFailure); }
                 });
                 if (ServerContext.current().isEmpty()) context = restart();
                 throw error;

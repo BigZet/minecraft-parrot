@@ -137,3 +137,29 @@ qa_shoulder_left` подтвердил FREEFOLLOW и исходный UUID QA1. 
 и replacement.png. Также отправлена !say на плече; прослушивание на слух
 не заявляется без подтверждения пользователя. Основной мир оставлен открытым
 для продолжающегося стрима.
+
+GameTests 16 октября: 26 тестов в src/gametest остались от приёмки 13 октября,
+6 падали ещё на релизе 1.1.0. Главная причина: сценарии писали legacy-файл
+`viewerparrots.json`, а мод с 1.1.0 читает `viewerparrots-settings.json`
+через ControlPanelService/SettingsStore. Поправлены под текущее поведение
+через общий тестовый SettingsFixture: acceptance-сценарий (come/follow/sit/
+dance, режимы смерти, измерения), contracts (reload имён и прав, атомарный
+отказ невалидного файла, cooldown-ы) и bootstrap loading (гейт переведён с
+чтения конфига на чтение реестра, так как настройки больше не читаются через
+storage-writer). В contracts ожидание «неизвестный звук отвергает reload»
+заменено на невалидный volume: с 1.1.0 файл настроек парсится без реестра
+звуков, неиграбельные звуки отфильтровывает SoundService; смена queueCapacity
+теперь не отвергается, а ждёт перезахода при применённых горячих настройках.
+Удалены три теста отменённых требований: `reloadIsAtomicNonblocking…`
+(bootstrap) и `deathModeReloadRejectsPendingDeadRespawn…` (diagnostics)
+проверяли порядок reload относительно очереди storage-writer, а reload теперь
+идёт на своём потоке настроек; `idleTraitsShareLimitsAndNeverBlockCommands`
+(personality) проверял idle-звуки, полёты и бегство характеров в состоянии
+IDLE, которого с 1.1.0 нет: новые птицы создаются в free, старое IDLE читается
+как free, и планировщик до idle-логики не доходит. Смерть, VANILLA_FINAL,
+замена MISSING и COME после SIT/DANCE остаются покрыты acceptance-сценарием.
+Особенность стенда: GameTest-сервер Fabric отвечает isDedicated()=true, поэтому
+ControlPanelService пропускает live-apply настроек, который на одиночном
+сервере стримера выполняется внутри reload; SettingsFixture.reload повторяет
+этот шаг явно. Код мода ради тестов не менялся. Итог: «All 23 required tests
+passed», `test assemble` зелёный.

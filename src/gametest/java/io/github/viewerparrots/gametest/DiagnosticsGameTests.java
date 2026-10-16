@@ -10,11 +10,8 @@ import io.github.viewerparrots.api.CommandStatus;
 import io.github.viewerparrots.api.ParrotAction;
 import io.github.viewerparrots.api.event.ParrotEvent;
 import io.github.viewerparrots.bootstrap.ServerContext;
-import io.github.viewerparrots.config.ConfigLoader;
 import io.github.viewerparrots.domain.BehaviorState;
-import io.github.viewerparrots.config.DeathMode;
 import io.github.viewerparrots.domain.DisplayName;
-import io.github.viewerparrots.domain.PhysicalStatus;
 import io.github.viewerparrots.domain.ViewerId;
 import io.github.viewerparrots.domain.ViewerParrotRecord;
 import net.fabricmc.fabric.api.gametest.v1.FabricGameTest;
@@ -34,8 +31,6 @@ import org.apache.logging.log4j.core.config.Property;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.nio.file.Files;
-import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -48,161 +43,6 @@ public final class DiagnosticsGameTests implements FabricGameTest {
     public void structuredCommandsRetainIdentityAndListenerOrder(TestContext test) {
         if (!FixtureCallbacks.ready(test, () -> structuredCommandsRetainIdentityAndListenerOrder(test))) return;
         new Scenario(test).run();
-    }
-
-    @GameTest(batchId = "diagnostics-policy", templateName = EMPTY_STRUCTURE, tickLimit = 600)
-    public void deathModeReloadRejectsPendingDeadRespawnButAllowsMissingReplacement(TestContext test) {
-        if (!FixtureCallbacks.ready(test, () -> deathModeReloadRejectsPendingDeadRespawnButAllowsMissingReplacement(test))) return;
-        PolicyScenario scenario = new PolicyScenario(test);
-        scenario.safely(scenario::start);
-    }
-
-    private static final class PolicyScenario {
-        final TestContext test;
-        final ServerContext context = ServerContext.current().orElseThrow();
-        final ViewerId viewer = ViewerId.of("policy-" + UUID.randomUUID().toString().substring(0, 8));
-        final CountDownLatch release = new CountDownLatch(1);
-        final CountDownLatch entered = new CountDownLatch(1);
-        String originalConfig;
-        ServerPlayerEntity target;
-        ViewerParrotRecord dead;
-        boolean failed;
-
-        PolicyScenario(TestContext test) { this.test = test; }
-        void start() {
-            try { originalConfig = Files.readString(context.configFile()); }
-            catch (IOException error) { throw new IllegalStateException(error); }
-            for (int x = -8; x <= 16; x++) for (int z = -8; z <= 16; z++)
-                test.getWorld().setBlockState(test.getAbsolutePos(new BlockPos(x, 1, z)), Blocks.STONE.getDefaultState());
-            target = test.createMockCreativeServerPlayerInWorld();
-            Vec3d position = Vec3d.ofBottomCenter(test.getAbsolutePos(new BlockPos(4, 2, 4)));
-            target.refreshPositionAndAngles(position.x, position.y, position.z, 0, 0);
-            writeConfig(DeathMode.MANUAL_RESPAWN);
-            await(context.reload(UUID.randomUUID(), Scenario.ADMIN), reloaded -> {
-                successful(reloaded);
-                await(context.streamerService().assign(UUID.randomUUID(), Scenario.ADMIN, target.getUuid()), assigned -> {
-                    successful(assigned);
-                    await(context.parrotService().create(UUID.randomUUID(), Scenario.ADMIN, viewer, DisplayName.of("Policy")), created -> {
-                        successful(created);
-                        var bird = context.loadedIndex().find(viewer).orElseThrow();
-                        bird.kill();
-                        test.assertTrue(context.registry().find(viewer).orElseThrow().physicalStatus() == PhysicalStatus.DEAD,
-                                "Actual administrative death creates the DEAD fixture");
-                        bird.discard();
-                        dead = context.registry().find(viewer).orElseThrow();
-                        await(context.writer().submit(() -> true), ignored -> gateReload());
-                    });
-                });
-            });
-        }
-        void gateReload() {
-            context.writer().submit(() -> {
-                entered.countDown();
-                if (!release.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("QA writer gate timed out");
-                return true;
-            });
-            waitForGate();
-        }
-        void waitForGate() {
-            if (entered.getCount() != 0) { test.waitAndRun(1, () -> safely(this::waitForGate)); return; }
-            writeConfig(DeathMode.VANILLA_FINAL);
-            // Both requests enter under MANUAL. The actual reload read is queued before
-            // PREPARE, so its server callback publishes VANILLA_FINAL before finishRespawn.
-            CompletableFuture<CommandResult> reload = context.reload(UUID.randomUUID(), Scenario.ADMIN);
-            CompletableFuture<CommandResult> respawn = context.parrotService().respawn(UUID.randomUUID(), Scenario.ADMIN, viewer);
-            test.assertTrue(!respawn.isDone() && context.config().deathMode() == DeathMode.MANUAL_RESPAWN,
-                    "DEAD respawn is genuinely pending under the original policy");
-            release.countDown();
-            await(reload, reloaded -> {
-                successful(reloaded);
-                test.assertTrue(context.config().deathMode() == DeathMode.VANILLA_FINAL, "Actual reload published the restrictive policy");
-                await(respawn, result -> {
-                    test.assertTrue(result.status() == CommandStatus.REJECTED && result.code() == io.github.viewerparrots.diagnostics.ErrorCode.RESPAWN_DISABLED,
-                            "Pending DEAD respawn obeys the newly published death policy: " + result);
-                    var current = context.registry().find(viewer).orElseThrow();
-                    test.assertTrue(current.equals(dead) && !context.loadedIndex().isLoaded(viewer)
-                                    && context.registry().pendingReservations() == 0 && !context.parrotService().operationPending(viewer),
-                            "Policy rejection retains the DEAD identity and releases temporary resources");
-                    await(context.parrotService().remove(UUID.randomUUID(), Scenario.ADMIN, viewer), removed -> {
-                        successful(removed);
-                        missingReplacement();
-                    });
-                });
-            });
-        }
-        void missingReplacement() {
-            await(context.parrotService().create(UUID.randomUUID(), Scenario.ADMIN, viewer, DisplayName.of("Missing")), created -> {
-                successful(created);
-                ViewerParrotRecord original = context.registry().find(viewer).orElseThrow();
-                context.loadedIndex().find(viewer).orElseThrow().discard();
-                context.recoveryService().start(viewer);
-                waitForMissing(original, context.clock().currentTick() + 200);
-            });
-        }
-        void waitForMissing(ViewerParrotRecord original, long deadline) {
-            if (context.registry().find(viewer).orElseThrow().physicalStatus() != PhysicalStatus.MISSING) {
-                test.assertTrue(context.clock().currentTick() < deadline, "Actual missing-body recovery completes within its deadline");
-                test.waitAndRun(1, () -> safely(() -> waitForMissing(original, deadline)));
-                return;
-            }
-            await(context.parrotService().respawn(UUID.randomUUID(), Scenario.ADMIN, viewer), replacement -> {
-                successful(replacement);
-                ViewerParrotRecord current = context.registry().find(viewer).orElseThrow();
-                test.assertTrue(current.generation() == original.generation() + 1
-                                && current.incarnationId().equals(original.incarnationId()) && !current.entityUuid().equals(original.entityUuid()),
-                        "VANILLA_FINAL still allows legitimate MISSING replacement with a new generation and UUID");
-                await(context.parrotService().remove(UUID.randomUUID(), Scenario.ADMIN, viewer), removed -> {
-                    successful(removed);
-                    restoreConfig();
-                    removeTarget();
-                    test.complete();
-                });
-            });
-        }
-        void writeConfig(DeathMode mode) {
-            JsonObject candidate = JsonParser.parseString(ConfigLoader.toJson(context.config())).getAsJsonObject();
-            candidate.addProperty("deathMode", mode.name());
-            candidate.getAsJsonObject("behavior").addProperty("enabled", false);
-            try { Files.writeString(context.configFile(), candidate.toString()); }
-            catch (IOException error) { throw new IllegalStateException(error); }
-        }
-        void successful(CommandResult result) { test.assertTrue(result.succeeded(), "Policy fixture operation succeeds: " + result); }
-        <T> void await(CompletableFuture<T> future, Consumer<T> next) {
-            if (future.isDone()) safely(() -> next.accept(future.join()));
-            else test.waitAndRun(1, () -> await(future, next));
-        }
-        void safely(Runnable work) {
-            if (failed) return;
-            try { work.run(); }
-            catch (RuntimeException | Error error) {
-                failed = true;
-                release.countDown();
-                cleanup(error);
-            }
-        }
-        void cleanup(Throwable error) {
-            if (context.parrotService().operationPending(viewer)) { test.waitAndRun(1, () -> cleanup(error)); return; }
-            CompletableFuture<CommandResult> removal = context.registry().contains(viewer)
-                    ? context.parrotService().remove(UUID.randomUUID(), Scenario.ADMIN, viewer)
-                    : CompletableFuture.completedFuture(null);
-            cleanupAfterRemoval(removal, error);
-        }
-        void cleanupAfterRemoval(CompletableFuture<CommandResult> removal, Throwable error) {
-            if (!removal.isDone()) { test.waitAndRun(1, () -> cleanupAfterRemoval(removal, error)); return; }
-            try { restoreConfig(); } catch (RuntimeException restore) { error.addSuppressed(restore); }
-            removeTarget();
-            test.waitAndRun(1, () -> { if (error instanceof Error fatal) throw fatal; throw (RuntimeException) error; });
-        }
-        void restoreConfig() {
-            if (originalConfig == null) return;
-            try { Files.writeString(context.configFile(), originalConfig); }
-            catch (IOException error) { throw new IllegalStateException(error); }
-            successful(FixtureCallbacks.finish(context.server(), context.reload(UUID.randomUUID(), Scenario.ADMIN)));
-        }
-        void removeTarget() {
-            if (target != null && context.server().getPlayerManager().getPlayer(target.getUuid()) != null)
-                context.server().getPlayerManager().remove(target);
-        }
     }
 
     private static final class Scenario {
