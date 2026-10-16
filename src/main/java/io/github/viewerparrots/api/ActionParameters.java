@@ -8,7 +8,7 @@ import java.util.UUID;
 
 /** Typed values for the only actions requiring parameters; arbitrary executable JSON is never accepted. */
 public sealed interface ActionParameters permits ActionParameters.None, ActionParameters.Name,
-        ActionParameters.Trait, ActionParameters.Target, ActionParameters.Page, ActionParameters.Speech {
+        ActionParameters.Trait, ActionParameters.Target, ActionParameters.Page, ActionParameters.Speech, ActionParameters.Color {
     boolean supports(ParrotAction action);
 
     enum None implements ActionParameters {
@@ -21,6 +21,11 @@ public sealed interface ActionParameters permits ActionParameters.None, ActionPa
     record Name(DisplayName name) implements ActionParameters {
         public Name { Objects.requireNonNull(name, "name"); }
         @Override public boolean supports(ParrotAction action) { return action == ParrotAction.CREATE || action == ParrotAction.RENAME; }
+    }
+    /** Явный окрас для {@code !color синий}; {@code !color} без аргумента идёт с {@link None} и выбирает другой случайный. */
+    record Color(io.github.viewerparrots.domain.ParrotVariant variant) implements ActionParameters {
+        public Color { Objects.requireNonNull(variant, "variant"); }
+        @Override public boolean supports(ParrotAction action) { return action == ParrotAction.COLOR; }
     }
     record Trait(ParrotTrait trait) implements ActionParameters {
         public Trait { Objects.requireNonNull(trait, "trait"); }

@@ -203,6 +203,7 @@ public record ModSettings(int schemaVersion, String activeProfile, Map<String, P
                 case SAY -> ParrotAction.SAY_COOLDOWN_TICKS;
                 case SPIN -> ParrotAction.SPIN_COOLDOWN_TICKS;
                 case HAT, DEHAT -> ParrotAction.HAT_COOLDOWN_TICKS;
+                case COLOR -> ParrotAction.COLOR_COOLDOWN_TICKS;
                 case EXP -> ParrotAction.EXP_COOLDOWN_TICKS;
                 case FREE, FREEFOLLOW, VIEW, DEVIEW, ARM, DEARM -> ParrotAction.SIMPLE_CONTROL_COOLDOWN_TICKS;
                 case LOVE -> 40;

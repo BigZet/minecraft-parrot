@@ -24,7 +24,7 @@ public final class CommandPolicy {
 
     public static boolean preservesBehavior(ParrotAction action) {
         return switch (action) {
-            case HAT, DEHAT, VIEW, DEVIEW, SPIN, SCREAM, LOVE, EXP, ROULETTE -> true;
+            case HAT, DEHAT, COLOR, VIEW, DEVIEW, SPIN, SCREAM, LOVE, EXP, ROULETTE -> true;
             default -> false;
         };
     }

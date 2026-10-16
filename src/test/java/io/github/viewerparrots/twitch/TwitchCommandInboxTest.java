@@ -96,6 +96,18 @@ class TwitchCommandInboxTest {
         assertEquals("\u043f\u0440\u0438\u0432\u0435\u0442 [\u0448\u0451\u043f\u043e\u0442]", inline.text());
     }
 
+    @Test void colorTakesAnOptionalNameAndOtherCommandsStillRejectArguments() {
+        var random = TwitchCommandInbox.command(message("5", "!Color", "color-random"), "streamer").orElseThrow();
+        assertEquals(ParrotAction.COLOR, random.action());
+        assertSame(ActionParameters.None.INSTANCE, random.parameters());
+        var named = TwitchCommandInbox.command(message("5", "!color  Зелёный", "color-named"), "streamer").orElseThrow();
+        assertEquals(io.github.viewerparrots.domain.ParrotVariant.GREEN, ((ActionParameters.Color) named.parameters()).variant());
+        assertEquals("twitch:5", named.viewerId().value());
+        assertTrue(TwitchCommandInbox.command(message("5", "!color фиолетовый", "color-unknown"), "streamer").isEmpty());
+        assertTrue(TwitchCommandInbox.command(message("5", "!sit now", "sit-arg"), "streamer").isEmpty());
+        assertTrue(TwitchCommandInbox.command(message("5", "!colors", "color-lookalike"), "streamer").isEmpty());
+    }
+
     @Test void ignoresEmptySpeechAndCommandPrefixLookalikes() {
         for (String text : new String[]{"!say", "!SAY   ", "!say\u2003\u00a0", "!saying Hello", "!sayHello", "!say [\u0437\u043b\u043e]", "!say [\u0437\u043b\u043e]   "})
             assertTrue(TwitchCommandInbox.command(message("123", text, "empty-speech"), "streamer").isEmpty());

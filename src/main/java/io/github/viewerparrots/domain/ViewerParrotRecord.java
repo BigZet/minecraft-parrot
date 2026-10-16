@@ -90,6 +90,14 @@ public record ViewerParrotRecord(
 		return bump(now).withViewer(this.viewer.withDisplayName(newName));
 	}
 
+	public ViewerParrotRecord withVariant(ParrotVariant newVariant, Instant now) {
+		ViewerParrotRecord bumped = bump(now);
+		return new ViewerParrotRecord(bumped.viewer, bumped.incarnationId, bumped.generation,
+				bumped.entityUuid, newVariant, bumped.trait, bumped.desiredBehavior,
+				bumped.physicalStatus, bumped.lastKnownLocation, bumped.lastSpawnedAt,
+				bumped.updatedAt, bumped.revision);
+	}
+
 	public ViewerParrotRecord withTrait(ParrotTrait newTrait, Instant now) {
 		ViewerParrotRecord bumped = bump(now);
 		return new ViewerParrotRecord(bumped.viewer, bumped.incarnationId, bumped.generation,

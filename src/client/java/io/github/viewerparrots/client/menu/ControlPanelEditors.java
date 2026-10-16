@@ -250,7 +250,7 @@ final class ControlPanelEditors {
             info("Плечо", bird.shoulder().isBlank() ? "Не на плече" : bird.shoulder());
             info("Голос", bird.voice().isBlank() ? "Не назначен" : bird.voice());
             info("Шляпа", bird.hat().isBlank() ? "Нет" : bird.hat());
-            for (String action : List.of("COME", "FOLLOW", "FREE", "FREEFOLLOW", "VIEW", "DEVIEW", "ARM", "DEARM", "SIT", "DANCE", "SPIN", "SCREAM", "LOVE", "HAT", "DEHAT", "EXP", "ROULETTE")) {
+            for (String action : List.of("COME", "FOLLOW", "FREE", "FREEFOLLOW", "VIEW", "DEVIEW", "ARM", "DEARM", "SIT", "DANCE", "SPIN", "SCREAM", "LOVE", "HAT", "DEHAT", "COLOR", "EXP", "ROULETTE")) {
                 action(ControlPanelScreen.commandDescription(action), "Меню закроется перед действием.", ControlPanelScreen.commandLabel(action), owner.worldOpen(), () -> owner.runWorld(bird.viewerId(), action, "", false));
             }
             heading("Личные настройки");

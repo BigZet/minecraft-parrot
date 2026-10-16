@@ -432,6 +432,23 @@ public final class ViewerParrotService {
 	 * Command adapters wait for it before reporting terminal success. An I/O failure blocks
 	 * further mutations and cancels authoritative behavior through the degraded context.
 	 */
+	/** Durable-часть {@code !color}: права, cooldown и состояние уже проверены игровым путём команд. */
+	public CompletableFuture<Void> recordVariant(ViewerId viewerId, ParrotVariant variant) {
+		Optional<ViewerParrotRecord> existing = this.context.registry().find(viewerId);
+		if (existing.isEmpty()) {
+			return CompletableFuture.failedFuture(new IllegalStateException("viewer removed"));
+		}
+		if (existing.get().variant() == variant) return CompletableFuture.completedFuture(null);
+		UUID id = UUID.randomUUID();
+		return guarded(id, viewerId, "PERSIST_VARIANT", () -> mutate(id, viewerId,
+				record -> record.withVariant(variant, this.context.clock().now()),
+				"viewerparrots.action.ok", updated -> {})).thenApply(result -> {
+			if (!result.succeeded()) throw new java.util.concurrent.CompletionException(
+					new IllegalStateException(result.code().name()));
+			return null;
+		});
+	}
+
 	public CompletableFuture<Void> recordDesiredBehavior(ViewerId viewerId, DesiredBehavior desiredBehavior) {
 		Optional<ViewerParrotRecord> existing = this.context.registry().find(viewerId);
 		if (existing.isEmpty()) {

@@ -19,6 +19,7 @@ import java.util.regex.Pattern;
 public final class TwitchCommandInbox {
     private static final Pattern SPEECH_PREFIX = Pattern.compile("^!say\\s",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CHARACTER_CLASS);
+    private static final Pattern WORD_SPLIT = Pattern.compile("\\s+", Pattern.UNICODE_CHARACTER_CLASS);
     private final String channel;
     private final int capacity;
     private final ArrayDeque<Entry> queue = new ArrayDeque<>();
@@ -37,7 +38,11 @@ public final class TwitchCommandInbox {
                 || !message.userId().matches("[0-9]{1,32}") || message.text() == null) return Optional.empty();
         String text = message.text().strip();
         boolean speech = SPEECH_PREFIX.matcher(text).find();
-        ParrotAction action = speech ? ParrotAction.SAY : switch (text.toLowerCase(Locale.ROOT)) {
+        // Аргумент принимают только !say и !color; остальные команды пишутся ровно одним словом, как раньше.
+        String[] words = WORD_SPLIT.split(text, 2);
+        String argument = words.length > 1 ? words[1].strip() : "";
+        boolean colorCommand = words[0].equalsIgnoreCase("!color");
+        ParrotAction action = speech ? ParrotAction.SAY : colorCommand ? ParrotAction.COLOR : switch (text.toLowerCase(Locale.ROOT)) {
             case "!parrot" -> ParrotAction.CREATE;
             case "!come" -> ParrotAction.COME;
             case "!follow" -> ParrotAction.FOLLOW;
@@ -60,9 +65,15 @@ public final class TwitchCommandInbox {
         };
         if (action == null) return Optional.empty();
         try {
-            ActionParameters parameters = action == ParrotAction.CREATE
-                    ? new ActionParameters.Name(DisplayName.of(message.displayName()))
-                    : speech ? ActionParameters.Speech.parse(text.substring(4)) : ActionParameters.None.INSTANCE;
+            ActionParameters parameters;
+            if (action == ParrotAction.CREATE) parameters = new ActionParameters.Name(DisplayName.of(message.displayName()));
+            else if (speech) parameters = ActionParameters.Speech.parse(text.substring(4));
+            else if (colorCommand && !argument.isEmpty()) {
+                // Неизвестный цвет не превращается в случайный: такое сообщение просто не команда.
+                var variant = io.github.viewerparrots.cosmetic.ParrotColors.parse(argument);
+                if (variant.isEmpty()) return Optional.empty();
+                parameters = new ActionParameters.Color(variant.get());
+            } else parameters = ActionParameters.None.INSTANCE;
             UUID commandId = message.messageId() == null || message.messageId().isEmpty() ? UUID.randomUUID()
                     : UUID.nameUUIDFromBytes(("twitch-message:" + message.messageId()).getBytes(StandardCharsets.UTF_8));
             return Optional.of(new CommandRequest(commandId, ViewerId.of("twitch:" + message.userId()), action, parameters));
