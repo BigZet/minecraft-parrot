@@ -98,8 +98,15 @@ public final class TwitchIrcClient implements AutoCloseable {
 				publish(firstAttempt ? Status.CONNECTING : Status.RECONNECTING);
 				try {
 					authFailed = readSession();
-				} catch (IOException | RuntimeException ignored) {
-					// Status contains no raw IRC, credentials, or exception message.
+					if (!authFailed && !closed.get()) {
+						io.github.viewerparrots.ViewerParrotsMod.LOGGER.info("Twitch: сервер закрыл соединение или запросил RECONNECT");
+					}
+				} catch (IOException | RuntimeException failure) {
+					// Only the exception class reaches the log: no raw IRC, credentials, or exception message.
+					// SocketTimeoutException / SSLException / EOFException tell a VPN stall from a Twitch-side drop.
+					if (!closed.get()) {
+						io.github.viewerparrots.ViewerParrotsMod.LOGGER.info("Twitch: соединение прервано ({})", failure.getClass().getSimpleName());
+					}
 				}
 				if (authFailed) {
 					publish(Status.AUTH_FAILED);
@@ -125,6 +132,11 @@ public final class TwitchIrcClient implements AutoCloseable {
 		}
 	}
 
+	/** Отдельный класс, чтобы в логе причина реконнекта отличалась от сетевых IOException. */
+	private static final class ChannelJoinTimeoutException extends IOException {
+		private ChannelJoinTimeoutException() { super("Twitch channel join timed out"); }
+	}
+
 	/** @return true only when Twitch explicitly rejects the credentials. */
 	private boolean readSession() throws IOException {
 		Socket socket = connectionFactory.connect();
@@ -146,7 +158,7 @@ public final class TwitchIrcClient implements AutoCloseable {
 			StringBuilder incoming = new StringBuilder();
 			while (!closed.get()) {
 				if (!connected && System.nanoTime() - joinDeadline >= 0) {
-					throw new IOException("Twitch channel join timed out");
+					throw new ChannelJoinTimeoutException();
 				}
 				int next;
 				try {
