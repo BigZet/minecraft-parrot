@@ -183,7 +183,7 @@ public final class ControlPanelScreen extends JsonFormScreen {
     }
 
     private void commands() {
-        heading("Чат-команды — 19 действий");
+        heading("Чат-команды — " + profile().getAsJsonObject("commands").size() + " действий");
         JsonObject commands = profile().getAsJsonObject("commands");
         for (String name : commands.keySet()) {
             JsonObject rule = commands.getAsJsonObject(name);

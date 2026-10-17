@@ -19,11 +19,17 @@ import java.util.Set;
 
 /** Public, credential-free snapshots shared by the control panel and server settings service. */
 public record ModSettings(int schemaVersion, String activeProfile, Map<String, Profile> profiles, Twitch twitch) {
-    private static final Set<ParrotAction> CHAT_ACTIONS = Set.of(ParrotAction.CREATE, ParrotAction.COME,
+    /**
+     * Команды, доступные из Twitch-чата: каждая получает правило (включена, роли, cooldown) и строку в F8.
+     * Действие вне этого списка для Twitch — PERMISSION_DENIED, поэтому новая чат-команда обязана быть здесь.
+     */
+    public static final Set<ParrotAction> CHAT_ACTIONS = Set.of(ParrotAction.CREATE, ParrotAction.COME,
             ParrotAction.FOLLOW, ParrotAction.FREE, ParrotAction.FREEFOLLOW, ParrotAction.VIEW,
             ParrotAction.DEVIEW, ParrotAction.ARM, ParrotAction.DEARM, ParrotAction.SIT,
             ParrotAction.DANCE, ParrotAction.SPIN, ParrotAction.SCREAM, ParrotAction.SAY,
-            ParrotAction.LOVE, ParrotAction.HAT, ParrotAction.DEHAT, ParrotAction.EXP, ParrotAction.ROULETTE);
+            ParrotAction.LOVE, ParrotAction.HAT, ParrotAction.DEHAT, ParrotAction.EXP, ParrotAction.ROULETTE,
+            ParrotAction.COLOR, ParrotAction.NAME, ParrotAction.EMOTE,
+            ParrotAction.FIGHT, ParrotAction.ACCEPT, ParrotAction.DECLINE);
 
     public ModSettings {
         if (schemaVersion != 1) throw new IllegalArgumentException("schemaVersion must be 1");

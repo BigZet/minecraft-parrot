@@ -21,7 +21,13 @@ class SettingsStoreTest {
     @Test void defaultsRoundTripAndContainAllCommandsAndVoices() {
         ModSettings defaults = ModSettings.defaults();
         assertEquals(defaults, SettingsStore.parse(SettingsStore.toJson(defaults)));
-        assertEquals(19, defaults.active().commands().size());
+        assertEquals(25, defaults.active().commands().size());
+        // Every viewer-level game or sound action, plus !parrot, must have a chat rule: without one Twitch gets PERMISSION_DENIED.
+        for (ParrotAction action : ParrotAction.values()) {
+            boolean viewerAction = action == ParrotAction.CREATE || (action.access() == ParrotAction.Access.CONTROL
+                    && (action.category() == ParrotAction.Category.GAME || action.category() == ParrotAction.Category.SOUND));
+            if (viewerAction) assertTrue(ModSettings.CHAT_ACTIONS.contains(action), action + " is missing from CHAT_ACTIONS");
+        }
         assertEquals(24, defaults.active().speech().voices().size());
         assertEquals(180.0, defaults.active().gameplay().spinDegreesPerTick());
         assertEquals(75, defaults.active().gameplay().headTurnThreshold());
