@@ -37,6 +37,7 @@
   "viewerparrots.error.entity_unresolved": "Instance state not yet determined",
   "viewerparrots.error.entity_already_loaded": "Instance is already loaded",
   "viewerparrots.error.invalid_state": "Action is not allowed in the current state",
+  "viewerparrots.error.parrot_caged": "The parrot is in a cage",
   "viewerparrots.error.respawn_disabled": "Respawn is disabled by the death policy",
   "viewerparrots.error.command_on_cooldown": "Command on cooldown, retry in %s s",
   "viewerparrots.error.global_rate_limited": "Too many actions, retry in %s s",

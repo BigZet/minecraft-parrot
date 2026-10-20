@@ -32,6 +32,8 @@ public enum ErrorCode {
 	ENTITY_ALREADY_LOADED,
 
 	INVALID_STATE,
+	/** Птица сидит в клетке мода Parrot Cages; команды перемещения отклоняются. */
+	PARROT_CAGED,
 	RESPAWN_DISABLED,
 
 	/** Возвращается с retryAfterTicks. */

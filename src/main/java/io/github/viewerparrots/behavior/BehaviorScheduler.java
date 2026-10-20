@@ -10,6 +10,7 @@ import io.github.viewerparrots.diagnostics.ErrorCode;
 import io.github.viewerparrots.domain.BehaviorState;
 import io.github.viewerparrots.domain.DesiredBehavior;
 import io.github.viewerparrots.domain.ViewerId;
+import io.github.viewerparrots.entity.CageCompat;
 import io.github.viewerparrots.entity.HostileThreatAdapter;
 import io.github.viewerparrots.entity.ParrotEntityController;
 import io.github.viewerparrots.entity.SafePositionFinder;
@@ -93,6 +94,7 @@ public final class BehaviorScheduler {
 		if (runPendingLazyAction(id, runtime, parrot, now)) return true;
 		if (runtime.pendingAction().isPresent()) return true;
 		if (runtime.isDanceExpired(now)) finishDance(id, runtime, parrot);
+		if (CageCompat.isCaged(parrot) && holdInCage(id, runtime, parrot)) return true;
 		if ((runtime.behavior() == BehaviorState.IDLE && runtime.desiredBehavior() == DesiredBehavior.FOLLOWING
 				|| runtime.behavior() == BehaviorState.FREE && runtime.desiredBehavior() == DesiredBehavior.FREEFOLLOW)
 				&& context.streamerService().onlineTarget().isPresent()) {
@@ -103,6 +105,20 @@ public final class BehaviorScheduler {
 		if (runtime.behavior() == BehaviorState.FOLLOWING) { tickFollowing(id, runtime, parrot, now); return true; }
 		if (runtime.behavior() == BehaviorState.FREEFOLLOW) { tickFreeFollowing(id, runtime, parrot, now); return true; }
 		return runtime.behavior() != BehaviorState.IDLE || runtime.pendingAction().isPresent();
+	}
+
+	/** В клетке птица не летит к стримеру: «приди» завершается ошибкой, следование ждёт выхода из клетки. */
+	private boolean holdInCage(ViewerId id, ParrotRuntime runtime, ViewerParrotEntity parrot) {
+		BehaviorState behavior = runtime.behavior();
+		if (behavior == BehaviorState.RETURNING) { finishMovement(id, runtime, parrot, ErrorCode.PARROT_CAGED); return true; }
+		if (behavior == BehaviorState.FOLLOWING) { parrot.getNavigation().stop(); return true; }
+		if (behavior == BehaviorState.FREEFOLLOW) {
+			// Свободный полёт внутри клетки остаётся, догонять стримера птица не пытается.
+			if (runtime.isFreeFollowCatchingUp()) parrot.getNavigation().stop();
+			runtime.setFreeFollowCatchingUp(false);
+			return true;
+		}
+		return false;
 	}
 
 	private boolean rescueFromVoid(ViewerId id, ViewerParrotEntity parrot) {

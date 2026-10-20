@@ -37,6 +37,7 @@
   "viewerparrots.error.entity_unresolved": "Состояние экземпляра ещё не установлено",
   "viewerparrots.error.entity_already_loaded": "Экземпляр уже загружен",
   "viewerparrots.error.invalid_state": "Действие недопустимо в текущем состоянии",
+  "viewerparrots.error.parrot_caged": "Попугай сидит в клетке",
   "viewerparrots.error.respawn_disabled": "Восстановление запрещено политикой смерти",
   "viewerparrots.error.command_on_cooldown": "Команда на перезарядке, повторите через %s с",
   "viewerparrots.error.global_rate_limited": "Слишком много действий, повторите через %s с",
