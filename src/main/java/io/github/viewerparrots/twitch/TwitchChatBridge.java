@@ -1,5 +1,6 @@
 package io.github.viewerparrots.twitch;
 
+import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import io.github.viewerparrots.ViewerParrotsMod;
 import io.github.viewerparrots.api.ActorContext;
@@ -8,6 +9,7 @@ import io.github.viewerparrots.api.CommandResult;
 import io.github.viewerparrots.auth.TwitchAuthService;
 import io.github.viewerparrots.bootstrap.ServerContext;
 import io.github.viewerparrots.control.ControlPanelService;
+import io.github.viewerparrots.settings.ModSettings;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
@@ -17,7 +19,10 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
 
-/** World-owned IRC connection; credentials and network work stay off the game thread. */
+/**
+ * World-owned IRC connection; credentials and network work stay off the game thread.
+ * A dedicated server only ever reads chat anonymously, so no Twitch token reaches it.
+ */
 public final class TwitchChatBridge {
     private static volatile TwitchChatBridge active;
     private static volatile boolean paused;
@@ -33,7 +38,7 @@ public final class TwitchChatBridge {
     private TwitchChatBridge(ServerContext context) { this.context = context; }
 
     public static void onWorldOpened(ServerContext context) {
-        if (!context.server().isDedicated()) active = new TwitchChatBridge(context);
+        active = new TwitchChatBridge(context);
     }
 
     public static void onWorldClosed(MinecraftServer server) {
@@ -107,7 +112,7 @@ public final class TwitchChatBridge {
     /** Guest mode must be selected explicitly; failed authorization never silently becomes guest access. */
     public static CompletableFuture<String> connectFromSettings() {
         var bridge = active;
-        if (bridge == null) return CompletableFuture.completedFuture("Откройте одиночный мир.");
+        if (bridge == null) return CompletableFuture.completedFuture("Мир не открыт.");
         var result = new CompletableFuture<String>();
         long generation = bridge.connectGeneration.incrementAndGet();
         bridge.context.server().execute(() -> {
@@ -116,16 +121,17 @@ public final class TwitchChatBridge {
             bridge.autoConnectChecked = true;
             var settings = ControlPanelService.settings().twitch();
             if (settings.channel().isEmpty()) { result.complete("Укажите Twitch-канал в настройках."); return; }
+            boolean guest = guestOnly(bridge.context.server().isDedicated(), settings.guest());
             bridge.closeConnection();
             bridge.connectionState = "CONNECTING";
-            var auth = ControlPanelService.auth();
-            if (auth == null) {
+            var auth = guest ? null : ControlPanelService.auth();
+            if (!guest && auth == null) {
                 bridge.connectionState = "STOPPED";
                 result.complete("Настройки Twitch ещё загружаются.");
                 return;
             }
-            auth.configure(settings.clientId(), settings.login());
-            CompletableFuture<String> token = settings.guest() ? CompletableFuture.completedFuture("") : auth.accessToken();
+            if (auth != null) auth.configure(settings.clientId(), settings.login());
+            CompletableFuture<String> token = guest ? CompletableFuture.completedFuture("") : auth.accessToken();
             token.whenComplete((access, error) -> bridge.context.server().execute(() -> {
                 if (!bridge.current(generation)) { result.complete("Подключение отменено."); return; }
                 if (!settings.equals(ControlPanelService.settings().twitch())) {
@@ -133,17 +139,17 @@ public final class TwitchChatBridge {
                     result.complete("Настройки Twitch изменились. Нажмите «Подключить» ещё раз.");
                     return;
                 }
-                if (error != null || (!settings.guest() && (access == null || access.isBlank()))) {
+                if (error != null || (!guest && (access == null || access.isBlank()))) {
                     bridge.connectionState = "NEEDS_LOGIN";
                     result.complete("Войдите в Twitch через настройки или явно включите гостевое чтение.");
                     return;
                 }
                 try {
-                    String login = settings.guest() ? "" : auth.status().login();
+                    String login = guest ? "" : auth.status().login();
                     var credentials = new TwitchChatSettings(settings.autoConnect(), settings.channel(), login,
-                            settings.guest() ? "" : access);
+                            guest ? "" : access);
                     credentials.requireConfigured();
-                    Connection installed = bridge.new Connection(credentials, settings.guest(), bridge.context.twitchQueueCapacity());
+                    Connection installed = bridge.new Connection(credentials, guest, bridge.context.twitchQueueCapacity());
                     bridge.connection = installed;
                     bridge.lastResult = "—";
                     installed.client.start();
@@ -156,6 +162,9 @@ public final class TwitchChatBridge {
         });
         return result;
     }
+
+    /** A dedicated server ignores the account setting: it never logs in and never holds a Twitch token. */
+    static boolean guestOnly(boolean dedicated, boolean guestSetting) { return dedicated || guestSetting; }
 
     public static void disconnectNow() {
         var bridge = active;
@@ -228,13 +237,16 @@ public final class TwitchChatBridge {
                 .executes(ctx -> status(ctx.getSource()))
                 .then(CommandManager.literal("status").executes(ctx -> status(ctx.getSource())))
                 .then(CommandManager.literal("connect").executes(ctx -> connect(ctx.getSource())))
-                .then(CommandManager.literal("disconnect").executes(ctx -> disconnect(ctx.getSource())));
+                .then(CommandManager.literal("disconnect").executes(ctx -> disconnect(ctx.getSource())))
+                .then(CommandManager.literal("channel")
+                        .then(CommandManager.argument("channel", StringArgumentType.word())
+                                .executes(ctx -> setChannel(ctx.getSource(), StringArgumentType.getString(ctx, "channel")))));
     }
 
     private static TwitchChatBridge forSource(ServerCommandSource source) {
         var bridge = active;
         if (bridge == null || bridge.context.server() != source.getServer()) {
-            source.sendError(Text.literal("Twitch доступен в открытом одиночном мире."));
+            source.sendError(Text.literal("Twitch доступен в открытом мире."));
             return null;
         }
         return bridge;
@@ -257,6 +269,28 @@ public final class TwitchChatBridge {
         if (forSource(source) == null) return 0;
         disconnectNow();
         source.sendFeedback(() -> Text.literal("Twitch отключён. Попугаи остаются в мире."), false);
+        return 1;
+    }
+
+    /** Saves the channel to viewerparrots-settings.json; an open connection keeps its channel until reconnect. */
+    private static int setChannel(ServerCommandSource source, String channel) {
+        if (forSource(source) == null) return 0;
+        var current = ControlPanelService.settings();
+        var twitch = current.twitch();
+        ModSettings next;
+        try {
+            next = new ModSettings(current.schemaVersion(), current.activeProfile(), current.profiles(),
+                    new ModSettings.Twitch(twitch.autoConnect(), channel, twitch.login(), twitch.clientId(), twitch.guest()));
+        } catch (IllegalArgumentException invalid) {
+            source.sendError(Text.literal("Укажите логин Twitch-канала: латиница, цифры и _, до 25 символов."));
+            return 0;
+        }
+        String saved = next.twitch().channel();
+        ControlPanelService.save(next).whenComplete((applied, error) -> source.getServer().execute(() -> {
+            if (error != null) source.sendError(Text.literal("Не удалось сохранить канал Twitch."));
+            else source.sendFeedback(() -> Text.literal("Канал Twitch: #" + saved
+                    + ". Подключение: /vp twitch connect"), true);
+        }));
         return 1;
     }
 

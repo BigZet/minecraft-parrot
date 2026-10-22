@@ -71,7 +71,8 @@ public final class ViewerParrotCommands {
 						.requires(source -> allowed(source, ParrotAction.HELP))
 						.executes(ctx -> help(ctx.getSource())))
 
-				.then(TwitchChatBridge.commands().requires(source -> allowed(source, ParrotAction.STATUS)))
+				.then(TwitchChatBridge.commands().requires(source -> allowed(source, ParrotAction.STATUS)
+						|| streamerWithControl(source)))
 
 				.then(CommandManager.literal("streamer")
 						.requires(source -> allowed(source, ParrotAction.STREAMER))
@@ -295,7 +296,7 @@ public final class ViewerParrotCommands {
 				Alias: /vp. Names may contain spaces; quote viewer IDs containing ':'.""";
 		String admin = allowed(source, ParrotAction.CREATE) ? "\n" + """
 				/viewerparrot setstreamer <player>
-				/viewerparrot twitch connect | disconnect | status
+				/viewerparrot twitch connect | disconnect | status | channel <channel>
 				/viewerparrot create <viewerId> <name> | remove <viewerId>
 				/viewerparrot rename <viewerId> <name> | trait <viewerId> <trait>
 				/viewerparrot respawn <viewerId> | reconcile <viewerId>
@@ -600,6 +601,14 @@ public final class ViewerParrotCommands {
 		}
 		ActorContext actor = toActor(source, context.get());
 		return context.get().acceptingCommands() && context.get().permissions().isAllowed(actor, action);
+	}
+
+	/** Стример с правом управления попугаями включает и выключает чат своего канала без админского уровня. */
+	private static boolean streamerWithControl(ServerCommandSource source) {
+		ServerPlayerEntity player = source.getPlayer();
+		Optional<ServerContext> context = ServerContext.current();
+		return player != null && context.isPresent() && allowed(source, ParrotAction.HELP)
+				&& context.get().streamerService().configuredUuid().filter(player.getUuid()::equals).isPresent();
 	}
 
 	private static ActorContext toActor(ServerCommandSource source, ServerContext context) {
