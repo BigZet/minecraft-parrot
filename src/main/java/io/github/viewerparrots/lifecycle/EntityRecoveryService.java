@@ -28,6 +28,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Ограниченный поиск потерянного экземпляра (раздел 9.3 ТЗ).
@@ -82,6 +83,8 @@ public final class EntityRecoveryService {
 		private final UUID expectedEntityUuid;
 		private final UUID ticketKey = UUID.randomUUID();
 		private final long deadlineTick;
+		/** Чтение чанка идёт по реальному времени: при ускоренных тиках дедлайн не наступает раньше, чем за timeoutTicks × 50 мс. */
+		private final long deadlineNanos;
 		private final UUID incarnationId;
 		private final long generation;
 		private final long startedNanos = AuditLog.started();
@@ -95,6 +98,8 @@ public final class EntityRecoveryService {
 			this.chunkPos = chunkPos;
 			this.expectedEntityUuid = record.expectedEntityUuid().orElseThrow();
 			this.deadlineTick = deadlineTick;
+			this.deadlineNanos = System.nanoTime()
+					+ Math.max(0, deadlineTick - world.getServer().getTicks()) * TimeUnit.MILLISECONDS.toNanos(50);
 			this.incarnationId = record.incarnationId();
 			this.generation = record.generation();
 			this.auditContext = AuditLog.Context.of(null, record, "RECOVERY");
@@ -219,7 +224,7 @@ public final class EntityRecoveryService {
 				continue;
 			}
 
-			if (now >= job.deadlineTick) {
+			if (now >= job.deadlineTick && System.nanoTime() - job.deadlineNanos >= 0) {
 				release(job);
 				iterator.remove();
 				this.lastFailures.put(viewerId, ErrorCode.RECOVERY_TIMEOUT);
