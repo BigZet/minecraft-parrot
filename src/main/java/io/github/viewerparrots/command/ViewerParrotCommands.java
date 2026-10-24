@@ -64,7 +64,8 @@ public final class ViewerParrotCommands {
 
 	private static LiteralArgumentBuilder<ServerCommandSource> build() {
 		return CommandManager.literal("viewerparrot")
-				.requires(source -> allowed(source, ParrotAction.HELP))
+				// Стример без опа видит корень ради /vp cage; остальные узлы проверяют права сами.
+				.requires(source -> allowed(source, ParrotAction.HELP) || io.github.viewerparrots.cage.CageJail.warden(source))
 				.executes(ctx -> help(ctx.getSource()))
 
 				.then(CommandManager.literal("help")
@@ -173,6 +174,21 @@ public final class ViewerParrotCommands {
 				.then(gameAction("decline", ParrotAction.DECLINE))
 				.then(gameAction("exp", ParrotAction.EXP))
 				.then(gameAction("roulette", ParrotAction.ROULETTE))
+
+				// Тюрьма Parrot Cages: сажают стример и администратор, выпускает администратор.
+				.then(CommandManager.literal("cage")
+						.requires(io.github.viewerparrots.cage.CageJail::warden)
+						.then(viewerIdArgument()
+								.executes(ctx -> io.github.viewerparrots.cage.CageJail.cageCommand(ctx.getSource(),
+										StringArgumentType.getString(ctx, "viewerId"), -1))
+								.then(CommandManager.argument("minutes", IntegerArgumentType.integer(0, 60))
+										.executes(ctx -> io.github.viewerparrots.cage.CageJail.cageCommand(ctx.getSource(),
+												StringArgumentType.getString(ctx, "viewerId"), IntegerArgumentType.getInteger(ctx, "minutes"))))))
+				.then(CommandManager.literal("uncage")
+						.requires(io.github.viewerparrots.cage.CageJail::isAdmin)
+						.then(viewerIdArgument()
+								.executes(ctx -> io.github.viewerparrots.cage.CageJail.uncageCommand(ctx.getSource(),
+										StringArgumentType.getString(ctx, "viewerId")))))
 
 				.then(CommandManager.literal("save")
 						.requires(source -> allowed(source, ParrotAction.SAVE))
@@ -293,6 +309,8 @@ public final class ViewerParrotCommands {
 				/viewerparrot hat <viewerId> | dehat <viewerId> (random different hat / remove; 2-second cooldown)
 				/viewerparrot say <viewerId> <text> (first 30 words; 2-second cooldown)
 				/viewerparrot roulette <viewerId> (4-second spin + 2-second result; prize drops at parrot; 60-second cooldown)
+				/viewerparrot cage <viewerId> [minutes] (streamer/admin: into the nearest free Parrot Cages cage; 0 = no end)
+				/viewerparrot uncage <viewerId> (admin: release a jailed parrot)
 				Alias: /vp. Names may contain spaces; quote viewer IDs containing ':'.""";
 		String admin = allowed(source, ParrotAction.CREATE) ? "\n" + """
 				/viewerparrot setstreamer <player>

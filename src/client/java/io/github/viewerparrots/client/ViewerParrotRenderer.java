@@ -9,6 +9,8 @@ import net.minecraft.client.render.entity.EntityRendererFactory;
 import net.minecraft.client.render.entity.ParrotEntityRenderer;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.passive.ParrotEntity;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 import net.minecraft.util.math.RotationAxis;
 
 /**
@@ -36,6 +38,23 @@ public class ViewerParrotRenderer extends ParrotEntityRenderer {
 			// The renderer's model is shared by birds; hiding a crest must never leak to the next one.
 			feather.visible = featherVisible;
 		}
+	}
+
+	/** Узник Parrot Cages: «Имя · в клетке 3:12» (или «бессрочно»); время мира клиента идёт вместе с сервером. */
+	@Override
+	protected void renderLabelIfPresent(ParrotEntity entity, Text text, MatrixStack matrices, VertexConsumerProvider vertices,
+			int light, float tickDelta) {
+		if (entity instanceof ViewerParrotEntity parrot && parrot.jailUntil() != 0) {
+			long until = parrot.jailUntil();
+			String left;
+			if (until < 0) left = "бессрочно";
+			else {
+				long seconds = Math.max(0, (until - parrot.getWorld().getTime()) / 20);
+				left = seconds / 60 + ":" + (seconds % 60 < 10 ? "0" : "") + seconds % 60;
+			}
+			text = text.copy().append(Text.literal(" · в клетке " + left).formatted(Formatting.GOLD));
+		}
+		super.renderLabelIfPresent(entity, text, matrices, vertices, light, tickDelta);
 	}
 
 	@Override

@@ -36,6 +36,7 @@ public class ViewerParrotsMod implements ModInitializer {
 		ClientCompatibility.register();
 		FabricLifecycleAdapter.register();
 		ViewerParrotCommands.register();
+		io.github.viewerparrots.cage.CageJail.install();
 		AuditLog.info("common_initialized", null, "READY", null, started,
 				java.util.Map.of("minecraft", "1.21.1"), null);
 	}

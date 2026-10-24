@@ -32,7 +32,7 @@ import java.util.function.Supplier;
 
 /** Russian control panel. Editing is local until the user explicitly applies the draft. */
 public final class ControlPanelScreen extends JsonFormScreen {
-    private static final String[] TABS = {"Обзор", "Twitch", "Команды", "Лимиты и блокировки", "Попугаи", "Поведение", "Озвучка и голоса", "Рулетка", "Профили и прочее"};
+    private static final String[] TABS = {"Обзор", "Twitch", "Команды", "Лимиты и блокировки", "Попугаи", "Поведение", "Озвучка и голоса", "Рулетка", "Профили и прочее", "Клетка"};
     private JsonObject saved;
     private int tab;
     private int ticks;
@@ -89,7 +89,7 @@ public final class ControlPanelScreen extends JsonFormScreen {
         int navWidth = left - 21;
         for (int i = 0; i < TABS.length; i++) {
             int selected = i;
-            int step = Math.max(17, Math.min(24, (height - 95) / 9));
+            int step = Math.max(17, Math.min(24, (height - 95) / TABS.length));
             ButtonWidget button = fixed(button(TABS[i], 8, 47 + i * step, navWidth, () -> {
                 tab = selected;
                 query = "";
@@ -120,6 +120,7 @@ public final class ControlPanelScreen extends JsonFormScreen {
             case 6 -> speech();
             case 7 -> roulette();
             case 8 -> advanced();
+            case 9 -> cage();
             default -> { }
         }
     }
@@ -333,6 +334,85 @@ public final class ControlPanelScreen extends JsonFormScreen {
             if (index < 0) categories.add(changed); else categories.set(index, changed);
             rebuild();
         }, index < 0 || categories.size() == 1 ? null : () -> { categories.remove(index); rebuild(); }));
+    }
+
+    /**
+     * Тюрьма Parrot Cages: её настройки и узники живут в том моде, здесь — его объект {@code parrotcages:admin}
+     * (протокол mobtalk-admin) из общего реестра Fabric. Правка применяется сразу, без «Применить».
+     */
+    private void cage() {
+        heading("Клетка Parrot Cages");
+        Object shared = net.fabricmc.loader.api.FabricLoader.getInstance().getObjectShare().get(io.github.viewerparrots.entity.CageCompat.ADMIN);
+        if (!(shared instanceof java.util.function.UnaryOperator<?> operator)) {
+            info("Мод не найден", "Установите Parrot Cages: клетки, сроки и их настройки живут в нём");
+            return;
+        }
+        @SuppressWarnings("unchecked") java.util.function.UnaryOperator<String> admin = (java.util.function.UnaryOperator<String>) operator;
+        info("Кто сажает", "Попугаев зрителей сажают и выпускают только стример и администратор; остальным — «Замок стримера»");
+        JsonObject values = JsonParser.parseString(admin.apply("{\"op\":\"values\"}")).getAsJsonObject();
+        JsonObject described = JsonParser.parseString(admin.apply("{\"op\":\"describe\"}")).getAsJsonObject();
+        for (JsonElement group : described.getAsJsonArray("groups")) for (JsonElement element : group.getAsJsonObject().getAsJsonArray("fields")) {
+            JsonObject field = element.getAsJsonObject();
+            String key = field.get("key").getAsString(), title = field.get("title").getAsString(), help = field.get("help").getAsString();
+            if (!values.has(key)) continue;
+            if (field.get("type").getAsString().equals("bool")) {
+                boolean on = values.get(key).getAsBoolean();
+                action(title, help, on ? "Включено" : "Выключено", true, () -> cagePatch(admin, key, new JsonPrimitive(!on)));
+            } else {
+                int value = values.get(key).getAsInt();
+                String shown = key.equals("defaultMinutes") && value == 0 ? "бессрочно" : Integer.toString(value);
+                action(title, help, shown + " · дальше", true, () -> cagePatch(admin, key, new JsonPrimitive(nextPreset(key, value))));
+            }
+        }
+        heading("Узники");
+        JsonObject listed = JsonParser.parseString(admin.apply("{\"op\":\"actions\"}")).getAsJsonObject();
+        JsonArray buttons = listed.has("actions") ? listed.getAsJsonArray("actions") : new JsonArray();
+        boolean any = false;
+        for (JsonElement element : buttons) {
+            String id = element.getAsJsonObject().get("id").getAsString();
+            if (!id.startsWith("release:")) continue;
+            any = true;
+            String parrot = id.substring("release:".length());
+            String title = element.getAsJsonObject().get("title").getAsString().replaceFirst("^Освободить ", "");
+            actions(title, "Срок в скобках.", new String[] {"Освободить", "+5 мин"},
+                    new Runnable[] {() -> cageAction(admin, "release:" + parrot), () -> cageAction(admin, "extend:" + parrot)}, true);
+        }
+        if (!any) info("Узников нет", worldOpen() ? "Стример сажает попугая зрителя семенами у клетки или командой /vp cage <viewerId>" : "Откройте одиночный мир");
+    }
+
+    private static int nextPreset(String key, int value) {
+        int[] presets = switch (key) {
+            case "defaultMinutes" -> new int[] {1, 2, 3, 5, 10, 15, 30, 60, 0};
+            case "offlineReleaseMinutes" -> new int[] {10, 15, 30, 60, 120, 240};
+            case "amnestyVotes" -> new int[] {2, 3, 5, 7, 10, 15, 20};
+            case "amnestyWindowSeconds" -> new int[] {30, 60, 90, 120, 300};
+            case "thiefChancePercent" -> new int[] {0, 5, 10, 15, 25, 50, 100};
+            default -> new int[] {value};
+        };
+        for (int i = 0; i < presets.length; i++) if (presets[i] == value) return presets[(i + 1) % presets.length];
+        return presets[0];
+    }
+
+    private void cagePatch(java.util.function.UnaryOperator<String> admin, String key, JsonPrimitive value) {
+        JsonObject changes = new JsonObject();
+        changes.add(key, value);
+        JsonObject request = new JsonObject();
+        request.addProperty("op", "patch");
+        request.add("values", changes);
+        JsonObject answer = JsonParser.parseString(admin.apply(request.toString())).getAsJsonObject();
+        boolean ok = answer.has("ok") && answer.get("ok").getAsBoolean();
+        notify(ok ? "Сохранено в config/parrotcages.json" : "Не сохранено: " + answer.get("errors"), !ok);
+        rebuild();
+    }
+
+    private void cageAction(java.util.function.UnaryOperator<String> admin, String id) {
+        JsonObject request = new JsonObject();
+        request.addProperty("op", "action");
+        request.addProperty("id", id);
+        JsonObject answer = JsonParser.parseString(admin.apply(request.toString())).getAsJsonObject();
+        boolean ok = !answer.has("ok") || answer.get("ok").getAsBoolean();
+        notify(answer.has("message") ? answer.get("message").getAsString() : answer.has("error") ? answer.get("error").getAsString() : "Готово", !ok);
+        rebuild();
     }
 
     private void advanced() {
