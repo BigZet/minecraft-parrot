@@ -64,7 +64,8 @@ public final class ViewerParrotCommands {
 
 	private static LiteralArgumentBuilder<ServerCommandSource> build() {
 		return CommandManager.literal("viewerparrot")
-				.requires(source -> allowed(source, ParrotAction.HELP))
+				// Стример без опа видит корень ради /vp cage; остальные узлы проверяют права сами.
+				.requires(source -> allowed(source, ParrotAction.HELP) || io.github.viewerparrots.cage.CageJail.warden(source))
 				.executes(ctx -> help(ctx.getSource()))
 
 				.then(CommandManager.literal("help")
