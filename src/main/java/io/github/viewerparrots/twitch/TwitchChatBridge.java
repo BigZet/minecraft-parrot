@@ -60,6 +60,7 @@ public final class TwitchChatBridge {
         var connection = bridge.connection;
         if (connection == null) return;
         if (!bridge.accepting(connection)) { connection.inbox.discardPending(); return; }
+        io.github.viewerparrots.cage.CageJail.drain(context);
         int perTick = ControlPanelService.settings().active().moderation().commandsPerTick();
         for (int i = 0; i < perTick; i++) {
             var next = connection.inbox.pollEntry();
@@ -318,7 +319,8 @@ public final class TwitchChatBridge {
             this.guest = guest;
             inbox = new TwitchCommandInbox(channel, capacity);
             client = new TwitchIrcClient(channel, settings.login(), settings.oauthToken(), message -> {
-                if (accepting(this)) inbox.offer(message);
+                // !свободу и !вклетку — не команды птицы зрителя, а дело тюрьмы Parrot Cages.
+                if (accepting(this) && !io.github.viewerparrots.cage.CageJail.offer(message)) inbox.offer(message);
             }, next -> {
                 if (closed || active != TwitchChatBridge.this || connection != this) return;
                 status = next;

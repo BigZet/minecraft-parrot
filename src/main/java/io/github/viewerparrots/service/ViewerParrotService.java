@@ -562,6 +562,10 @@ public final class ViewerParrotService {
 
 		ViewerParrotRecord record = existing.get();
 
+		if (io.github.viewerparrots.cage.CageJail.isJailed(viewerId)) {
+			// Узник Parrot Cages не получает новое тело на свободе.
+			return completed(CommandResult.rejected(commandId, ErrorCode.PARROT_CAGED));
+		}
 		if (this.context.loadedIndex().isLoaded(viewerId)) {
 			// Замена загруженного экземпляра запрещена: сначала он должен исчезнуть.
 			return completed(CommandResult.rejected(commandId, ErrorCode.ENTITY_ALREADY_LOADED));

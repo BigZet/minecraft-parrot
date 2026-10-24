@@ -159,7 +159,10 @@ public final class ParrotCommandService {
             if (this.context.streamerService().onlineTarget().isEmpty()) return CommandResult.rejected(commandId, ErrorCode.TARGET_UNAVAILABLE);
         }
         if (!isGameAction(action)) return CommandResult.rejected(commandId, ErrorCode.INVALID_ARGUMENT);
-        if (CageCompat.leavesCage(action) && CageCompat.isCaged(parrot)) return CommandResult.rejected(commandId, ErrorCode.PARROT_CAGED);
+        if (CageCompat.leavesCage(action) && CageCompat.isCaged(parrot)) {
+            CageCompat.refused(parrot);
+            return CommandResult.rejected(commandId, ErrorCode.PARROT_CAGED);
+        }
         ParrotRuntime runtime = this.context.runtime(viewerId);
         BehaviorStateMachine.Event event = toEvent(action);
         boolean releaseShoulder = CommandPolicy.releasesShoulder(action) && this.context.shoulderService().contains(viewerId);

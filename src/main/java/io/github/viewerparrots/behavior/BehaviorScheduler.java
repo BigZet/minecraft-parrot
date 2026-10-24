@@ -60,6 +60,7 @@ public final class BehaviorScheduler {
 			if (runtime == null || parrot == null || parrot.isRemoved() || parrot.isAiDisabled()) continue;
 			long started = AuditLog.started();
 			try {
+				io.github.viewerparrots.cage.CageJail.tick(context, id, parrot);
 				if (rescueFromVoid(id, parrot) || tickExplicit(id, runtime, parrot, now)) continue;
 			} catch (RuntimeException e) {
 				UUID commandId = runtime.pendingAction().map(ParrotRuntime.PendingAction::commandId).orElseGet(() -> runtime.movementCommandId().orElse(null));

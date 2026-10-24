@@ -66,6 +66,9 @@ public class ViewerParrotEntity extends ParrotEntity {
 			DataTracker.registerData(ViewerParrotEntity.class, TrackedDataHandlerRegistry.INTEGER);
 	private static final TrackedData<Boolean> VIEWING_STREAMER =
 			DataTracker.registerData(ViewerParrotEntity.class, TrackedDataHandlerRegistry.BOOLEAN);
+	/** Тюрьма Parrot Cages для таблички: 0 — не узник, −1 — бессрочно, иначе время мира, когда птица выйдет. */
+	private static final TrackedData<Long> JAIL_UNTIL =
+			DataTracker.registerData(ViewerParrotEntity.class, TrackedDataHandlerRegistry.LONG);
 
 	/** Собственный namespace в NBT, чтобы не пересекаться с ванильными полями попугая. */
 	private static final String MARKER_KEY = ViewerParrotsMod.MOD_ID;
@@ -175,7 +178,11 @@ public class ViewerParrotEntity extends ParrotEntity {
 		builder.add(EMOTE_ID, "");
 		builder.add(EMOTE_STARTED_AT, -1L);
 		builder.add(DUEL_PHASE, 0);
+		builder.add(JAIL_UNTIL, 0L);
 	}
+
+	public long jailUntil() { return this.dataTracker.get(JAIL_UNTIL); }
+	public void setJailUntil(long until) { if (jailUntil() != until) this.dataTracker.set(JAIL_UNTIL, until); }
 
 	// --- Маркер реестра (раздел 4.3 ТЗ) --------------------------------------
 
